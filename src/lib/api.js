@@ -4,10 +4,11 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://construction-api-nh
 
 const api = axios.create({
   baseURL: API_BASE,
-  headers: { 'Content-Type': 'application/json' }
+  headers: { 'Content-Type': 'application/json' },
+  timeout: 30000, // 30s timeout — handles Render free-tier cold start wake-up
 });
 
-// Attach token to every request
+// ─── REQUEST INTERCEPTOR — attach token ──────────────────────────────
 api.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('accessToken');
@@ -16,12 +17,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 → refresh token
+// ─── RESPONSE INTERCEPTOR — refresh token + error handling ──────────
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && error.response?.data?.code === 'TOKEN_EXPIRED' && !original._retry) {
+
+    // Token expired → try refresh
+    if (
+      error.response?.status === 401 &&
+      error.response?.data?.code === 'TOKEN_EXPIRED' &&
+      !original._retry
+    ) {
       original._retry = true;
       try {
         const refreshToken = localStorage.getItem('refreshToken');
@@ -34,6 +41,13 @@ api.interceptors.response.use(
         if (typeof window !== 'undefined') window.location.href = '/login';
       }
     }
+
+    // Network error / timeout — likely Render cold start
+    if (!error.response) {
+      error.friendlyMessage =
+        'Cannot reach the server. If this is the first request, the server may be waking up — please wait 30 seconds and try again.';
+    }
+
     return Promise.reject(error);
   }
 );
@@ -46,7 +60,7 @@ export const authAPI = {
   logout: () => api.post('/auth/logout'),
 };
 
-// ─── DASHBOARD ──────────────────────────────────────────────────────
+// ─── DASHBOARD ───────────────────────────────────────────────────────
 export const dashboardAPI = {
   getStats: () => api.get('/dashboard/stats'),
   getAttendanceChart: (days = 7) => api.get(`/dashboard/attendance-chart?days=${days}`),
@@ -55,7 +69,7 @@ export const dashboardAPI = {
   getProjectSummary: (id) => api.get(`/dashboard/project-summary/${id}`),
 };
 
-// ─── PROJECTS ───────────────────────────────────────────────────────
+// ─── PROJECTS ────────────────────────────────────────────────────────
 export const projectsAPI = {
   getAll: (params) => api.get('/projects', { params }),
   getById: (id) => api.get(`/projects/${id}`),
@@ -64,7 +78,7 @@ export const projectsAPI = {
   updateGeofence: (id, data) => api.put(`/projects/${id}/geofence`, data),
 };
 
-// ─── USERS ──────────────────────────────────────────────────────────
+// ─── USERS ───────────────────────────────────────────────────────────
 export const usersAPI = {
   getAll: (params) => api.get('/users', { params }),
   getById: (id) => api.get(`/users/${id}`),
@@ -73,13 +87,13 @@ export const usersAPI = {
   resetPassword: (id, password) => api.put(`/users/${id}/reset-password`, { password }),
 };
 
-// ─── ATTENDANCE ─────────────────────────────────────────────────────
+// ─── ATTENDANCE ──────────────────────────────────────────────────────
 export const attendanceAPI = {
   getToday: (projectId) => api.get('/attendance/today', { params: { projectId } }),
   getHistory: (params) => api.get('/attendance/history', { params }),
 };
 
-// ─── TASKS ──────────────────────────────────────────────────────────
+// ─── TASKS ───────────────────────────────────────────────────────────
 export const tasksAPI = {
   getAll: (params) => api.get('/tasks', { params }),
   create: (data) => api.post('/tasks', data),
@@ -88,7 +102,7 @@ export const tasksAPI = {
   delete: (id) => api.delete(`/tasks/${id}`),
 };
 
-// ─── LABOUR ─────────────────────────────────────────────────────────
+// ─── LABOUR ──────────────────────────────────────────────────────────
 export const labourAPI = {
   getLabourers: (params) => api.get('/labour/labourers', { params }),
   createLabourer: (data) => api.post('/labour/labourers', data),
@@ -97,7 +111,7 @@ export const labourAPI = {
   getWageReport: (params) => api.get('/labour/wage-report', { params }),
 };
 
-// ─── PURCHASE ORDERS ────────────────────────────────────────────────
+// ─── PURCHASE ORDERS ─────────────────────────────────────────────────
 export const purchaseOrdersAPI = {
   getAll: (params) => api.get('/purchase-orders', { params }),
   getById: (id) => api.get(`/purchase-orders/${id}`),
@@ -105,18 +119,21 @@ export const purchaseOrdersAPI = {
   approve: (id) => api.put(`/purchase-orders/${id}/approve`),
   reject: (id, reason) => api.put(`/purchase-orders/${id}/reject`, { rejectionReason: reason }),
   assignVendor: (id, data) => api.put(`/purchase-orders/${id}/assign-vendor`, data),
-  assignDelivery: (id, deliveryPersonId) => api.put(`/purchase-orders/${id}/assign-delivery`, { deliveryPersonId }),
+  assignDelivery: (id, deliveryPersonId) =>
+    api.put(`/purchase-orders/${id}/assign-delivery`, { deliveryPersonId }),
 };
 
-// ─── DELIVERIES ─────────────────────────────────────────────────────
+// ─── DELIVERIES ──────────────────────────────────────────────────────
 export const deliveriesAPI = {
   getAll: (params) => api.get('/deliveries', { params }),
   getById: (id) => api.get(`/deliveries/${id}`),
-  markDelivered: (id, deliveryPhotoUrl) => api.put(`/deliveries/${id}/delivered`, { deliveryPhotoUrl }),
+  markPickedUp: (id) => api.put(`/deliveries/${id}/picked-up`),
+  markDelivered: (id, deliveryPhotoUrl) =>
+    api.put(`/deliveries/${id}/delivered`, { deliveryPhotoUrl }),
   verify: (id, data) => api.put(`/deliveries/${id}/verify`, data),
 };
 
-// ─── VENDORS ────────────────────────────────────────────────────────
+// ─── VENDORS ─────────────────────────────────────────────────────────
 export const vendorsAPI = {
   getAll: (params) => api.get('/vendors', { params }),
   getById: (id) => api.get(`/vendors/${id}`),
@@ -124,27 +141,32 @@ export const vendorsAPI = {
   update: (id, data) => api.put(`/vendors/${id}`, data),
 };
 
-// ─── NOTIFICATIONS ──────────────────────────────────────────────────
+// ─── NOTIFICATIONS ────────────────────────────────────────────────────
 export const notificationsAPI = {
   getAll: (params) => api.get('/notifications', { params }),
   markRead: (id) => api.put(`/notifications/${id}/read`),
   markAllRead: () => api.put('/notifications/read-all'),
 };
 
-// ─── UPLOADS ────────────────────────────────────────────────────────
+// ─── UPLOADS ─────────────────────────────────────────────────────────
 export const uploadsAPI = {
   uploadPhoto: (file, type = 'photos') => {
     const formData = new FormData();
     formData.append('file', file);
     return api.post(`/uploads/photo?type=${type}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadMultiple: (files, type = 'photos') => {
+    const formData = new FormData();
+    files.forEach((f) => formData.append('files', f));
+    return api.post(`/uploads/multiple?type=${type}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
 };
 
-export default api;
-
-// ─── MATERIALS ──────────────────────────────────────────────────────
+// ─── MATERIALS ───────────────────────────────────────────────────────
 export const materialsAPI = {
   getCatalog: (params) => api.get('/materials/catalog', { params }),
   getCategories: () => api.get('/materials/catalog/categories'),
@@ -153,3 +175,5 @@ export const materialsAPI = {
   update: (id, data) => api.put(`/materials/catalog/${id}`, data),
   delete: (id) => api.delete(`/materials/catalog/${id}`),
 };
+
+export default api;
