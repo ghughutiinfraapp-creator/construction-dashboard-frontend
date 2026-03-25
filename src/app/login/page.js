@@ -82,7 +82,7 @@ export default function LoginPage() {
                 <rect x="3" y="1" width="10" height="1.5" rx="0.75" fill="#1C1917"/>
               </svg>
             </div>
-            <span className="font-display font-light text-white text-lg tracking-tight">BuildTrack</span>
+            <span className="font-display font-light text-white text-lg tracking-tight">Ghughuti Infra</span>
           </div>
           <h2 className="font-display font-light text-white text-4xl leading-tight tracking-tight mb-4">
             Manage every<br/><em>site, team &</em><br/>material.
@@ -117,7 +117,7 @@ export default function LoginPage() {
                 <rect x="9" y="4" width="6" height="11" rx="1" fill="#FBBF24"/>
               </svg>
             </div>
-            <span className="font-display font-light text-stone-800 text-lg">BuildTrack</span>
+            <span className="font-display font-light text-stone-800 text-lg">Ghughuti Infra</span>
           </div>
 
           <div className="mb-8">
