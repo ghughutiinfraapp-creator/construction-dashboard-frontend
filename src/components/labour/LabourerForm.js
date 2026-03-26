@@ -1,0 +1,130 @@
+'use client';
+import { useState, useEffect } from 'react';
+import { projectsAPI } from '../../lib/api';
+import Spinner from '../ui/Spinner';
+
+const TRADE_TYPES = [
+  'Mason', 'Carpenter', 'Electrician', 'Plumber', 'Painter',
+  'Welder', 'Steel Fixer', 'Helper', 'Supervisor', 'Other',
+];
+
+function FieldError({ msg }) {
+  if (!msg) return null;
+  return <p className="text-red-500 text-xs mt-1">{msg}</p>;
+}
+
+export default function LabourerForm({ onSubmit, onCancel }) {
+  const [form, setForm] = useState({
+    name: '', phone: '', aadhaar: '',
+    tradeType: '', dailyWage: '', projectId: '',
+  });
+  const [projects,   setProjects]   = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [errors,     setErrors]     = useState({});
+
+  useEffect(() => {
+    projectsAPI.getAll({ limit: 100 })
+      .then(({ data }) => setProjects(data.projects)).catch(() => {});
+  }, []);
+
+  const set = (k, v) => {
+    setForm(p => ({ ...p, [k]: v }));
+    if (errors[k]) setErrors(p => ({ ...p, [k]: '' }));
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim())    e.name      = 'Name is required';
+    if (!form.tradeType)      e.tradeType = 'Trade type is required';
+    if (!form.dailyWage || isNaN(Number(form.dailyWage)) || Number(form.dailyWage) <= 0)
+                              e.dailyWage = 'Enter a valid daily wage';
+    if (!form.projectId)      e.projectId = 'Project is required';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setSubmitting(true);
+    try {
+      const payload = {
+        ...form,
+        dailyWage: parseFloat(form.dailyWage),
+        phone:   form.phone   || undefined,
+        aadhaar: form.aadhaar || undefined,
+      };
+      await onSubmit(payload);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="p-5 space-y-4">
+      {/* Name */}
+      <div>
+        <label className="label">Full Name *</label>
+        <input className="input" value={form.name}
+          onChange={e => set('name', e.target.value)}
+          placeholder="e.g. Raju Singh" autoFocus />
+        <FieldError msg={errors.name} />
+      </div>
+
+      {/* Project + Trade */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Project *</label>
+          <select className="input select" value={form.projectId}
+            onChange={e => set('projectId', e.target.value)}>
+            <option value="">— Select project —</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <FieldError msg={errors.projectId} />
+        </div>
+        <div>
+          <label className="label">Trade Type *</label>
+          <select className="input select" value={form.tradeType}
+            onChange={e => set('tradeType', e.target.value)}>
+            <option value="">— Select trade —</option>
+            {TRADE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <FieldError msg={errors.tradeType} />
+        </div>
+      </div>
+
+      {/* Daily wage */}
+      <div>
+        <label className="label">Daily Wage (₹) *</label>
+        <input type="number" min="0" step="0.01" className="input"
+          value={form.dailyWage}
+          onChange={e => set('dailyWage', e.target.value)}
+          placeholder="500" />
+        <FieldError msg={errors.dailyWage} />
+      </div>
+
+      {/* Phone + Aadhaar */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="label">Phone</label>
+          <input className="input" value={form.phone}
+            onChange={e => set('phone', e.target.value)}
+            placeholder="9876543210" maxLength={10} />
+        </div>
+        <div>
+          <label className="label">Aadhaar</label>
+          <input className="input" value={form.aadhaar}
+            onChange={e => set('aadhaar', e.target.value)}
+            placeholder="XXXX XXXX XXXX" maxLength={12} />
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
+        <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
+        <button type="submit" className="btn-primary" disabled={submitting}>
+          {submitting ? <><Spinner size={13}/> Adding…</> : 'Add Labourer'}
+        </button>
+      </div>
+    </form>
+  );
+}
