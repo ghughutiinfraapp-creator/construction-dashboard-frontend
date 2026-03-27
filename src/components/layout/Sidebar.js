@@ -32,7 +32,9 @@ const NAV = [
     group: 'Admin',
     items: [
       { href: '/users', label: 'Users', icon: UsersIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER'] },
+      { href: '/materials', label: 'Materials', icon: MaterialIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER'] },
       { href: '/reports', label: 'Reports', icon: ReportIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE'] },
+      { href: '/notifications', label: 'Notifications', icon: BellIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE','SITE_ENGINEER','DELIVERY_PERSON','CLIENT'] },
     ]
   },
 ];
@@ -53,7 +55,7 @@ export default function Sidebar() {
               <rect x="3" y="1" width="10" height="1.5" rx="0.75" fill="#FBBF24"/>
             </svg>
           </div>
-          <span className="font-display font-light text-stone-800 text-base tracking-tight">Ghughuti Infra</span>
+          <span className="font-display font-light text-stone-800 text-base tracking-tight">BuildTrack</span>
         </Link>
       </div>
 
@@ -181,5 +183,20 @@ function ReportIcon({ size, active }) {
   return <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
     <rect x="2" y="1" width="12" height="14" rx="1.5" stroke={c} strokeWidth="1.3"/>
     <path d="M5 6h6M5 9h4M5 12h2" stroke={c} strokeWidth="1.2" strokeLinecap="round"/>
+  </svg>;
+}
+function MaterialIcon({ size, active }) {
+  const c = active ? 'white' : '#A8A29E';
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <rect x="1" y="7" width="14" height="8" rx="1.5" stroke={c} strokeWidth="1.3"/>
+    <path d="M4 7V5a4 4 0 018 0v2" stroke={c} strokeWidth="1.3"/>
+    <circle cx="8" cy="11" r="1.5" fill={c}/>
+  </svg>;
+}
+function BellIcon({ size, active }) {
+  const c = active ? 'white' : '#A8A29E';
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <path d="M13 10V7A5 5 0 003 7v3l-1.5 2h13L13 10z" stroke={c} strokeWidth="1.3" strokeLinejoin="round"/>
+    <path d="M6.5 13a1.5 1.5 0 003 0" stroke={c} strokeWidth="1.3" strokeLinecap="round"/>
   </svg>;
 }
