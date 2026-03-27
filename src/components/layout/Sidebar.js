@@ -55,7 +55,7 @@ export default function Sidebar() {
               <rect x="3" y="1" width="10" height="1.5" rx="0.75" fill="#FBBF24"/>
             </svg>
           </div>
-          <span className="font-display font-light text-stone-800 text-base tracking-tight">BuildTrack</span>
+          <span className="font-display font-light text-stone-800 text-base tracking-tight">Ghughuti Infra</span>
         </Link>
       </div>
 
