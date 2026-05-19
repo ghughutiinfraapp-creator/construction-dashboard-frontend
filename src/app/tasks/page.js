@@ -55,7 +55,7 @@ function DeleteConfirm({ task, onConfirm, onCancel }) {
 }
 
 // ── Kanban column ──────────────────────────────────────────────────────
-function KanbanColumn({ col, tasks, onStatusChange, onEdit, onDelete, canManage, loading }) {
+function KanbanColumn({ col, tasks, onStatusChange, onSubtaskStatusChange, onEdit, onDelete, canManage, loading }) {
   return (
     <div className="flex flex-col min-w-[260px] w-[260px]">
       {/* Column header */}
@@ -77,8 +77,11 @@ function KanbanColumn({ col, tasks, onStatusChange, onEdit, onDelete, canManage,
               </div>
             : tasks.map(t => (
                 <TaskCard key={t.id} task={t}
-                  onStatusChange={onStatusChange} onEdit={onEdit}
-                  onDelete={onDelete} canManage={canManage} />
+                  onStatusChange={onStatusChange}
+                  onSubtaskStatusChange={onSubtaskStatusChange}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  canManage={canManage} />
               ))
         }
       </div>
@@ -89,7 +92,7 @@ function KanbanColumn({ col, tasks, onStatusChange, onEdit, onDelete, canManage,
 // ── Main Page ──────────────────────────────────────────────────────────
 export default function TasksPage() {
   const { user } = useAuth();
-  const { tasks, total, loading, page, filters, setFilters, load, create, update, updateStatus, remove } = useTasks();
+  const { tasks, total, loading, page, filters, setFilters, load, create, update, updateStatus, updateSubtaskStatus, remove } = useTasks();
   const [view, setView]           = useState('list');  // 'list' | 'board'
   const [projects, setProjects]   = useState([]);
   const [search, setSearch]       = useState('');
@@ -146,6 +149,14 @@ export default function TasksPage() {
       await updateStatus(id, status);
     } catch {
       toast.error('Failed to update status');
+    }
+  };
+
+  const handleSubtaskStatusChange = async (subtaskId, parentId, status, currentSubtasks) => {
+    try {
+      await updateSubtaskStatus(subtaskId, parentId, status, currentSubtasks);
+    } catch {
+      toast.error('Failed to update sub-task status');
     }
   };
 
@@ -309,6 +320,7 @@ export default function TasksPage() {
                     {tasks.map(t => (
                       <TaskRow key={t.id} task={t}
                         onStatusChange={handleStatusChange}
+                        onSubtaskStatusChange={handleSubtaskStatusChange}
                         onEdit={setEditTask}
                         onDelete={(id) => setDeleteTask(tasks.find(x => x.id === id))}
                         canManage={canManage}
@@ -344,6 +356,7 @@ export default function TasksPage() {
                 <KanbanColumn key={col.key} col={col}
                   tasks={byStatus[col.key] || []}
                   onStatusChange={handleStatusChange}
+                  onSubtaskStatusChange={handleSubtaskStatusChange}
                   onEdit={setEditTask}
                   onDelete={(id) => setDeleteTask(tasks.find(x => x.id === id))}
                   canManage={canManage}

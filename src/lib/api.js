@@ -102,6 +102,11 @@ export const tasksAPI = {
   delete: (id) => api.delete(`/tasks/${id}`),
 };
 
+// ─── TASK CATEGORIES ─────────────────────────────────────────────────
+export const taskCategoriesAPI = {
+  getAll: (params) => api.get('/task-categories', { params }),
+};
+
 // ─── LABOUR ──────────────────────────────────────────────────────────
 export const labourAPI = {
   getLabourers: (params) => api.get('/labour/labourers', { params }),

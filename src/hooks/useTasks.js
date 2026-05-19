@@ -65,8 +65,40 @@ export function useTasks() {
     await tasksAPI.updateStatus(id, status);
     const label = status.replace(/_/g, ' ').toLowerCase();
     toast.success(`Moved to ${label}`);
-    // Optimistic update — no reload needed
     setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+  };
+
+  // Updates a subtask status + mirrors the backend's parent rollup locally so
+  // the parent task row reflects the correct status without a reload.
+  const updateSubtaskStatus = async (subtaskId, parentId, nextStatus, currentSubtasks) => {
+    await tasksAPI.updateStatus(subtaskId, nextStatus);
+
+    // Compute the rolled-up parent status the same way the backend does
+    const updated    = currentSubtasks.map(s => s.id === subtaskId ? { ...s, status: nextStatus } : s);
+    const DONE_SET   = new Set(['COMPLETED', 'VERIFIED']);
+    const allDone    = updated.every(s => DONE_SET.has(s.status));
+    const anyBlocked = updated.some(s => s.status === 'BLOCKED');
+    const anyActive  = updated.some(s => s.status === 'IN_PROGRESS');
+
+    let parentStatus = 'NOT_STARTED';
+    if (allDone)       parentStatus = 'COMPLETED';
+    else if (anyBlocked) parentStatus = 'BLOCKED';
+    else if (anyActive)  parentStatus = 'IN_PROGRESS';
+
+    setTasks(prev => prev.map(t => {
+      if (t.id !== parentId) return t;
+      return {
+        ...t,
+        status: parentStatus,
+        subtasks: updated,
+      };
+    }));
+
+    if (allDone) {
+      toast.success('All steps done — task marked as completed');
+    } else {
+      toast.success(`Sub-task moved to ${nextStatus.replace(/_/g, ' ').toLowerCase()}`);
+    }
   };
 
   const remove = async (id) => {
@@ -79,6 +111,6 @@ export function useTasks() {
   return {
     tasks, total, loading, page,
     filters, setFilters,
-    load, create, update, updateStatus, remove,
+    load, create, update, updateStatus, updateSubtaskStatus, remove,
   };
 }

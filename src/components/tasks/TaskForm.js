@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { projectsAPI, usersAPI } from '../../lib/api';
 import Spinner from '../ui/Spinner';
+import TaskCombobox from './TaskCombobox';
+import SubtaskPicker from './SubtaskPicker';
 
 const PRIORITIES = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const STATUSES   = ['NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'VERIFIED'];
@@ -12,6 +14,8 @@ function FieldError({ msg }) {
 }
 
 export default function TaskForm({ initial, onSubmit, onCancel }) {
+  const isEditing = !!initial;
+
   const [form, setForm] = useState({
     title:        '',
     description:  '',
@@ -21,15 +25,19 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
     status:       'NOT_STARTED',
     startDate:    '',
     dueDate:      '',
-    // Spread initial last so it overrides defaults
     ...initial,
-    // Normalize date strings to yyyy-mm-dd for <input type="date">
     startDate: initial?.startDate ? initial.startDate.slice(0, 10) : '',
     dueDate:   initial?.dueDate   ? initial.dueDate.slice(0, 10)   : '',
-    // Preserve FK ids from nested objects if editing
     projectId:    initial?.projectId    || initial?.project?.id    || '',
     assignedToId: initial?.assignedToId || initial?.assignedTo?.id || '',
   });
+
+  const [taskSel, setTaskSel] = useState({
+    value: initial?.title || '',
+    isCustom: true,
+    subs: [],
+  });
+  const [subtasks, setSubtasks] = useState([]); // selected sub-task name strings (create only)
 
   const [projects,    setProjects]    = useState([]);
   const [engineers,   setEngineers]   = useState([]);
@@ -52,6 +60,13 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
     if (errors[k]) setErrors(p => ({ ...p, [k]: '' }));
   };
 
+  const handleTaskSelect = ({ value, isCustom, subs }) => {
+    // Reset subtask selection when the task type changes
+    if (value !== taskSel.value) setSubtasks([]);
+    setTaskSel({ value, isCustom, subs });
+    set('title', value);
+  };
+
   const validate = () => {
     const e = {};
     if (!form.title.trim())  e.title     = 'Task title is required';
@@ -68,33 +83,117 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      // Strip empty optional fields so the API doesn't receive empty strings
-      const payload = { ...form };
-      if (!payload.assignedToId)  delete payload.assignedToId;
-      if (!payload.startDate)     delete payload.startDate;
-      if (!payload.dueDate)       delete payload.dueDate;
-      if (!payload.description?.trim()) delete payload.description;
-      await onSubmit(payload);
+      const base = { ...form };
+      if (!base.assignedToId)        delete base.assignedToId;
+      if (!base.startDate)           delete base.startDate;
+      if (!base.dueDate)             delete base.dueDate;
+      if (!base.description?.trim()) delete base.description;
+
+      // Attach subtasks if any were selected (create or edit)
+      if (subtasks.length > 0) {
+        base.subtasks = subtasks.map(title => ({ title }));
+      }
+
+      await onSubmit(base);
     } finally {
       setSubmitting(false);
     }
   };
 
+  const existingSubtasks = initial?.subtasks ?? [];
+
+  // Create: show for catalog match or custom input
+  // Edit:   show only for catalog match (so user can add more steps)
+  const showSubtaskPicker = form.title.trim() && (
+    isEditing
+      ? !taskSel.isCustom && taskSel.subs.length > 0
+      : taskSel.isCustom || taskSel.subs.length > 0
+  );
+
+  const submitLabel = isEditing
+    ? subtasks.length > 0
+      ? `Save + Add ${subtasks.length} Sub-task${subtasks.length > 1 ? 's' : ''}`
+      : 'Save Changes'
+    : subtasks.length > 0
+      ? `Create Task + ${subtasks.length} Sub-task${subtasks.length > 1 ? 's' : ''}`
+      : 'Create Task';
+
   return (
     <form onSubmit={handleSubmit} className="p-5 space-y-4">
 
-      {/* Title */}
+      {/* Task Title */}
       <div>
         <label className="label">Task Title *</label>
-        <input
-          className="input"
-          value={form.title}
-          onChange={e => set('title', e.target.value)}
-          placeholder="e.g. RCC column work – Ground floor"
-          autoFocus
+        <TaskCombobox
+          value={taskSel.value}
+          isCustom={taskSel.isCustom}
+          onChange={handleTaskSelect}
+          autoFocus={!isEditing}
         />
         <FieldError msg={errors.title} />
       </div>
+
+      {/* Sub-tasks */}
+      {showSubtaskPicker && (
+        <div className="animate-fade-in space-y-2">
+          {/* Existing subtasks (edit mode only) */}
+          {isEditing && existingSubtasks.length > 0 && (
+            <div className="rounded-lg border border-stone-100 bg-stone-50 p-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-2">
+                Existing sub-tasks ({existingSubtasks.length})
+              </p>
+              <div className="space-y-1">
+                {existingSubtasks.map(sub => (
+                  <div key={sub.id} className="flex items-center gap-2 text-xs text-stone-600">
+                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                      sub.status === 'COMPLETED' || sub.status === 'VERIFIED'
+                        ? 'bg-green-400'
+                        : sub.status === 'IN_PROGRESS'
+                          ? 'bg-blue-400'
+                          : sub.status === 'BLOCKED'
+                            ? 'bg-red-400'
+                            : 'bg-stone-300'
+                    }`} />
+                    <span className={sub.status === 'COMPLETED' || sub.status === 'VERIFIED' ? 'line-through text-stone-300' : ''}>
+                      {sub.title}
+                    </span>
+                    <span className="ml-auto text-[10px] text-stone-400 flex-shrink-0">
+                      {sub.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <div className="flex justify-between items-baseline mb-1.5">
+              <label className="label mb-0">
+                {isEditing ? 'Add more sub-tasks' : 'Sub-tasks'}
+                {!taskSel.isCustom && taskSel.subs.length > 0
+                  ? ` · ${taskSel.subs.length} available`
+                  : taskSel.isCustom ? ' (custom)' : ''}
+              </label>
+              {subtasks.length > 0 && (
+                <span className="text-[10px] text-stone-400">{subtasks.length} selected</span>
+              )}
+            </div>
+            <SubtaskPicker
+              subs={taskSel.subs}
+              isCustom={taskSel.isCustom}
+              selected={subtasks}
+              onChange={setSubtasks}
+            />
+            {!taskSel.isCustom && (
+              <p className="text-[10px] text-stone-400 mt-1.5">
+                {isEditing
+                  ? 'Ticked steps will be added as new sub-tasks.'
+                  : 'Each ticked step becomes a sub-task of this task.'}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Description */}
       <div>
@@ -180,17 +279,48 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
         </div>
       </div>
 
+      {/* Preview block — shown when 1+ sub-tasks selected */}
+      {subtasks.length > 0 && (
+        <div className="rounded-lg border border-stone-100 bg-stone-50 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-2">
+            {isEditing ? 'Adding' : 'Preview'} — {subtasks.length} sub-task{subtasks.length > 1 ? 's' : ''}
+          </p>
+          <div className="space-y-1.5">
+            {subtasks.map((s, i) => (
+              <div key={s} className="flex items-center gap-2.5 text-xs text-stone-700">
+                <span className="w-5 h-5 rounded flex-shrink-0 bg-white border border-stone-200 flex items-center justify-center text-[10px] font-semibold text-stone-400">
+                  {i + 1}
+                </span>
+                <span>{form.title} — {s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
-      <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
-        <button type="button" className="btn-secondary" onClick={onCancel}>
-          Cancel
-        </button>
-        <button type="submit" className="btn-primary" disabled={submitting || loadingData}>
-          {submitting
-            ? <><Spinner size={13} /> Saving…</>
-            : initial ? 'Save Changes' : 'Create Task'
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-stone-100">
+        <span className="text-xs text-stone-400">
+          {isEditing
+            ? subtasks.length > 0
+              ? <><strong className="text-stone-700">{subtasks.length}</strong> new sub-task{subtasks.length > 1 ? 's' : ''} will be added</>
+              : null
+            : subtasks.length > 0
+              ? <><strong className="text-stone-700">1</strong> task + <strong className="text-stone-700">{subtasks.length}</strong> sub-task{subtasks.length > 1 ? 's' : ''} will be created</>
+              : '1 task will be created'
           }
-        </button>
+        </span>
+        <div className="flex gap-2 ml-auto">
+          <button type="button" className="btn-secondary" onClick={onCancel}>
+            Cancel
+          </button>
+          <button type="submit" className="btn-primary" disabled={submitting || loadingData}>
+            {submitting
+              ? <><Spinner size={13} /> Saving…</>
+              : submitLabel
+            }
+          </button>
+        </div>
       </div>
     </form>
   );
