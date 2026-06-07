@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '../../../components/layout/DashboardLayout';
 import ProjectForm from '../../../components/projects/ProjectForm';
+import PaymentScheduleManager from '../../../components/projects/PaymentScheduleManager';
 import Modal from '../../../components/ui/Modal';
 import Badge from '../../../components/ui/Badge';
-import { projectsAPI, dashboardAPI, tasksAPI, attendanceAPI } from '../../../lib/api';
+import { projectsAPI, dashboardAPI, tasksAPI } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -55,6 +56,7 @@ export default function ProjectDetailPage() {
   const [savingGeo, setSavingGeo] = useState(false);
 
   const canEdit = user && ['SUPER_ADMIN','PROJECT_MANAGER'].includes(user.role);
+  const canManagePayments = user && ['SUPER_ADMIN','FINANCE'].includes(user.role);
 
   useEffect(() => { load(); }, [id]);
 
@@ -215,6 +217,15 @@ export default function ProjectDetailPage() {
             }
           </div>
         </div>
+
+        {/* ── Payment Schedule ── */}
+        {canManagePayments && (
+         <PaymentScheduleManager
+  projectId={id}
+  tasks={tasks}
+  userRole={user.role}
+/>
+        )}
       </div>
 
       {/* Edit modal */}
