@@ -605,23 +605,32 @@ export default function PaymentScheduleManager({
   const [modal,    setModal]    = useState(null);
   const [error,    setError]    = useState('');
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await paymentAPI.getSchedules(projectId);
-      const s = data?.schedules?.[0] ?? null;
-      setSchedule(s);
-      if (s) {
-        const sum = await paymentAPI.getSummary(s.id);
-        setSummary(sum);
-      }
-    } catch (e) {
-      setError(e.response?.data?.error || e.message || 'Failed to load payment schedule');
-    } finally {
-      setLoading(false);
+ const load = useCallback(async () => {
+  setLoading(true);
+  setError('');
+  try {
+    const data = await paymentAPI.getSchedules(projectId);
+    let s = data?.schedules?.[0] ?? null;
+
+    if (s && s.installments?.length) {
+      // Always derive total from live installments, never trust the stored field
+      const derivedTotal = s.installments.reduce(
+        (sum, i) => sum + parseFloat(i.amount || 0), 0
+      );
+      s = { ...s, totalAmount: derivedTotal };
     }
-  }, [projectId]);
+
+    setSchedule(s);
+    if (s) {
+      const sum = await paymentAPI.getSummary(s.id);
+      setSummary(sum);
+    }
+  } catch (e) {
+    setError(e.response?.data?.error || e.message || 'Failed to load payment schedule');
+  } finally {
+    setLoading(false);
+  }
+}, [projectId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -636,12 +645,21 @@ export default function PaymentScheduleManager({
     load();
   };
 
-  const handleInstDelete = (iid) => {
-    setSchedule(prev => ({
-      ...prev,
-      installments: prev.installments.filter(i => i.id !== iid),
-    }));
-  };
+ // Replace handleInstDelete with this:
+const handleInstDelete = (iid) => {
+  setSchedule(prev => {
+    const updatedInstallments = prev.installments.filter(i => i.id !== iid);
+    const newTotal = updatedInstallments.reduce(
+      (sum, i) => sum + parseFloat(i.amount || 0), 0
+    );
+    return { ...prev, installments: updatedInstallments, totalAmount: newTotal };
+  });
+  // Refresh summary counts from server (paid/overdue etc.)
+  // but don't reload schedule — that would reset totalAmount from DB
+  if (schedule?.id) {
+    paymentAPI.getSummary(schedule.id).then(setSummary).catch(() => {});
+  }
+};
 
   const canAdmin = userRole === 'SUPER_ADMIN';
 
@@ -696,8 +714,8 @@ export default function PaymentScheduleManager({
         .badge-info     { background: #dbeafe; color: #1e40af; }
         .badge-paid     { background: #d1fae5; color: #065f46; }
 
-        .inst-table      { border: 1px solid #e7e5e4; border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
-        .inst-table-head { display: grid; grid-template-columns: 40px 1fr 120px 120px 110px 110px 160px; padding: 10px 14px; background: #fafaf9; border-bottom: 1px solid #e7e5e4; }
+        .inst-table { border: 1px solid #e7e5e4; border-radius: 12px; overflow: hidden; margin-bottom: 12px; max-height: 380px; overflow-y: auto; }
+        .inst-table-head { display: grid; grid-template-columns: 40px 1fr 120px 120px 110px 110px 160px; padding: 10px 14px; background: #fafaf9; border-bottom: 1px solid #e7e5e4; position: sticky; top: 0; z-index: 1; }
         .inst-table-head span { font-size: 10px; font-weight: 600; color: #a8a29e; text-transform: uppercase; letter-spacing: 0.5px; }
         .inst-table-row  { display: grid; grid-template-columns: 40px 1fr 120px 120px 110px 110px 160px; padding: 12px 14px; border-bottom: 1px solid #f5f5f4; align-items: center; }
         .inst-table-row:last-child { border-bottom: none; }
@@ -779,14 +797,14 @@ export default function PaymentScheduleManager({
         .selected-reject    { border-color: #b91c1c; background: #fee2e2; color: #b91c1c; }
       `}</style>
 
-      <div className="psm-container">
+      <div className="psm-container overflow-y-auto">
         <div className="psm-header">
           <h3 className="psm-title">Payment schedule</h3>
           <div style={{ display: 'flex', gap: 8 }}>
             {schedule && canAdmin && (
               <>
                 <button className="btn-outline" onClick={() => setModal('addInst')}>+ Add installment</button>
-                <button className="btn-outline" onClick={() => setModal('editSchedule')}>Edit schedule</button>
+               
               </>
             )}
             {!schedule && canAdmin && (
@@ -837,15 +855,27 @@ export default function PaymentScheduleManager({
           tasks={tasks} projectId={projectId}
           onSave={handleScheduleSave} onClose={() => setModal(null)} />
       )}
-      {modal === 'addInst' && schedule && (
-        <InstallmentModal scheduleId={schedule.id} tasks={tasks}
-          onSave={(inst) => {
-            setSchedule(prev => ({ ...prev, installments: [...(prev.installments || []), inst] }));
-            setModal(null);
-            load();
-          }}
-          onClose={() => setModal(null)} />
-      )}
+{modal === 'addInst' && schedule && (
+  <InstallmentModal
+    scheduleId={schedule.id}
+    tasks={tasks}
+    onSave={(inst) => {
+      setSchedule(prev => {
+        const updatedInstallments = [...(prev.installments || []), inst];
+        const newTotal = updatedInstallments.reduce(
+          (sum, i) => sum + parseFloat(i.amount || 0), 0
+        );
+        return { ...prev, installments: updatedInstallments, totalAmount: newTotal };
+      });
+      setModal(null);
+      // Refresh summary counts only, not the full schedule
+      if (schedule?.id) {
+        paymentAPI.getSummary(schedule.id).then(setSummary).catch(() => {});
+      }
+    }}
+    onClose={() => setModal(null)}
+  />
+)}
     </>
   );
 }

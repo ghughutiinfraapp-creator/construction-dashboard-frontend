@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback,useRef  } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import TaskCard from '../../components/tasks/TaskCard';
 import TaskRow from '../../components/tasks/TaskRow';
@@ -23,6 +23,8 @@ const KANBAN_COLS = [
   { key: 'COMPLETED',   label: 'Completed',   accent: 'bg-green-400'   },
   { key: 'VERIFIED',    label: 'Verified',    accent: 'bg-stone-400'   },
 ];
+
+
 
 // ── Icons ──────────────────────────────────────────────────────────────
 function ListIcon()   { return <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>; }
@@ -114,20 +116,26 @@ export default function TasksPage() {
   }, []);
 
   // Debounced search
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const f = { ...filters, search };
-      setFilters(f);
-      load(1, f);
-    }, 350);
-    return () => clearTimeout(t);
-  }, [search]);
+// Replace the search useEffect with this:
+const prevSearch = useRef(search);
 
-  const applyFilter = (key, val) => {
-    const f = { ...filters, [key]: val };
+useEffect(() => {
+  if (prevSearch.current === search) return; // only fire when search actually changed
+  prevSearch.current = search;
+
+  const t = setTimeout(() => {
+    const f = { ...filters, search };
     setFilters(f);
     load(1, f);
-  };
+  }, 350);
+  return () => clearTimeout(t);
+}, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+ const applyFilter = (key, val) => {
+  const f = { ...filters, [key]: val };
+  setFilters(f);
+  load(1, f);  // ✅ passes override — this is fine
+};
 
   const handleCreate = async (data) => {
     await create(data);
@@ -212,22 +220,7 @@ export default function TasksPage() {
         {/* Stats bar */}
         <TaskStatsBar tasks={tasks} loading={loading} />
 
-        {/* Overdue warning */}
-        {!loading && overdueCount > 0 && (
-          <div className="flex items-center gap-3 px-4 py-2.5 bg-red-50 border border-red-100 rounded-xl">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-red-400 flex-shrink-0">
-              <path d="M8 2L1.5 13.5h13L8 2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
-              <path d="M8 7v3M8 11.5v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-            <p className="text-xs text-red-700 font-medium">
-              {overdueCount} task{overdueCount > 1 ? 's are' : ' is'} past the due date
-            </p>
-            <button className="ml-auto text-xs text-red-500 underline underline-offset-2"
-              onClick={() => applyFilter('status', 'IN_PROGRESS')}>
-              Filter overdue
-            </button>
-          </div>
-        )}
+       
 
         {/* Filters */}
         <div className="flex flex-wrap gap-2 items-center">
@@ -313,6 +306,7 @@ export default function TasksPage() {
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-stone-400 uppercase tracking-wide whitespace-nowrap">Priority</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-stone-400 uppercase tracking-wide whitespace-nowrap">Assigned To</th>
                       <th className="text-left px-4 py-2.5 text-[10px] font-semibold text-stone-400 uppercase tracking-wide whitespace-nowrap">Due Date</th>
+                     
                       <th className="px-4 py-2.5 w-10" />
                     </tr>
                   </thead>
