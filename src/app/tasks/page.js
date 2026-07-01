@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 
 // ── Constants ──────────────────────────────────────────────────────────
 const STATUSES   = ['NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED', 'VERIFIED'];
-const PRIORITIES = ['', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
+const PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const KANBAN_COLS = [
   { key: 'NOT_STARTED', label: 'Not Started', accent: 'bg-stone-200'   },
   { key: 'IN_PROGRESS', label: 'In Progress', accent: 'bg-blue-400'    },

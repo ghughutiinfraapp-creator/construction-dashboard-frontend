@@ -229,6 +229,7 @@ function PriorityBreakdown({ tasks }) {
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useAuth();
+  const canSeeBudget = user && ['SUPER_ADMIN', 'FINANCE'].includes(user.role);
 
   // Dashboard-level data
   const [stats,    setStats]    = useState(null);
@@ -296,7 +297,9 @@ export default function DashboardPage() {
               <StatCard label="Active Projects" value={stats?.activeProjects ?? '—'} sub={`of ${stats?.totalProjects ?? '—'} total`}        icon={<BuildingIcon />} color="stone"  loading={loading} />
               <StatCard label="Today Present"   value={stats?.todayAttendance ?? '—'} sub={`of ${stats?.totalEngineers ?? '—'} engineers`}  icon={<HardhatIcon />}  color="green"  loading={loading} />
               <StatCard label="Pending POs"     value={stats?.pendingPOs ?? '—'}       sub="awaiting action"                                  icon={<POIcon />}       color="amber"  loading={loading} />
-              <StatCard label="Budget Spent"     value={stats ? fmt(Number(stats.totalSpend)) : '—'} sub="closed POs"                         icon={<MoneyIcon />}    color="stone"  loading={loading} />
+              {canSeeBudget && (
+  <StatCard label="Budget Spent" value={stats ? fmt(Number(stats.totalSpend)) : '—'} sub="closed POs" icon={<MoneyIcon />} color="stone" loading={loading} />
+)}
             </div>
           )}
         </Section>

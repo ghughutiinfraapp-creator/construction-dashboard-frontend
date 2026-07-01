@@ -10,6 +10,8 @@
 import Link from 'next/link';
 import Badge from '../ui/Badge';
 import { format } from 'date-fns';
+import { useAuth } from '../../context/AuthContext';
+
 
 function ProgressBar({ value, max }) {
   const pct = max ? Math.min(100, Math.round((value / max) * 100)) : 0;
@@ -38,6 +40,8 @@ function fmt(n) {
  * { totalAmount, totalPaid, countPaid, totalInstallments }
  */
 export default function ProjectCard({ project, paymentSummary, userRole }) {
+  const { user } = useAuth();
+const canSeeBudget = user && ['SUPER_ADMIN', 'FINANCE'].includes(user.role);
   const { id, name, address, status, budget, startDate, endDate, manager, client, _count } = project;
   const totalTasks = _count?.tasks || 0;
   const tasksDone  = 0;
@@ -66,10 +70,17 @@ export default function ProjectCard({ project, paymentSummary, userRole }) {
       {/* Meta */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-3">
         {budget && (
-          <div>
-            <p className="text-[10px] text-stone-400 uppercase tracking-wide">Budget</p>
-            <p className="text-xs font-medium text-stone-700">{fmt(budget)}</p>
-          </div>
+         <div>
+  <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 mb-0.5">
+    {canSeeBudget ? 'Budget' : 'Progress'}
+  </p>
+  <p className="text-sm font-semibold text-stone-800">
+    {canSeeBudget
+      ? fmt(project.budget)
+      : `${project.completionPercentage ?? 0}% complete`
+    }
+  </p>
+</div>
         )}
         {(startDate || endDate) && (
           <div>

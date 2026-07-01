@@ -25,13 +25,12 @@ const NAV = [
     items: [
       { href: '/purchase-orders', label: 'Purchase Orders', icon: POIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE','SITE_ENGINEER'] },
       { href: '/deliveries', label: 'Deliveries', icon: DeliveryIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE','DELIVERY_PERSON'] },
-      { href: '/vendors', label: 'Vendors', icon: VendorIcon, roles: ['SUPER_ADMIN','FINANCE'] },
     ]
   },
   {
     group: 'Admin',
     items: [
-      { href: '/users', label: 'Users', icon: UsersIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER'] },
+      { href: '/users', label: 'Users', icon: UsersIcon, roles: ['SUPER_ADMIN'] },
       { href: '/materials', label: 'Materials', icon: MaterialIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER'] },
       { href: '/reports', label: 'Reports', icon: ReportIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE'] },
       { href: '/notifications', label: 'Notifications', icon: BellIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE','SITE_ENGINEER','DELIVERY_PERSON','CLIENT'] },

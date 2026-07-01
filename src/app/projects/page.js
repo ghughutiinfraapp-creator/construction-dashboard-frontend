@@ -25,6 +25,7 @@ function SearchIcon() {
 
 export default function ProjectsPage() {
   const { user } = useAuth();
+const canSeeBudget = user && ['SUPER_ADMIN', 'FINANCE'].includes(user.role);
   const { projects, total, loading, page, filters, setFilters, load, create, update } = useProjects();
   const [createOpen, setCreateOpen] = useState(false);
   const [search, setSearch] = useState('');

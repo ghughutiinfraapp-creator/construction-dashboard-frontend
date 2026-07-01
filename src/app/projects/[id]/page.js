@@ -57,6 +57,7 @@ export default function ProjectDetailPage() {
 
   const canEdit = user && ['SUPER_ADMIN','PROJECT_MANAGER'].includes(user.role);
   const canManagePayments = user && ['SUPER_ADMIN','FINANCE'].includes(user.role);
+  const canSeeBudget = user && ['SUPER_ADMIN','FINANCE'].includes(user.role);
 
   useEffect(() => { load(); }, [id]);
 
@@ -128,6 +129,23 @@ export default function ProjectDetailPage() {
   const totalTasks = Object.values(taskStatusMap).reduce((a, b) => a + b, 0);
   const taskPct = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
+  // PO count from summary — shown to PM instead of budget
+  const poCount = summary?.purchaseOrderCount ?? '—';
+
+  // KPI strip: Budget shown only to SUPER_ADMIN/FINANCE; PM sees PO Count instead
+  const kpiCards = canSeeBudget
+    ? [
+        { label: 'Budget',          value: fmt(project.budget)          },
+        { label: 'PO Spend',        value: fmt(summary?.totalPOSpend)   },
+        { label: "Today's Labour",  value: summary?.todayLabourCount ?? 0 },
+        { label: 'Task Progress',   value: `${taskPct}%`                },
+      ]
+    : [
+        { label: 'Purchase Orders', value: poCount                      },
+        { label: "Today's Labour",  value: summary?.todayLabourCount ?? 0 },
+        { label: 'Task Progress',   value: `${taskPct}%`                },
+      ];
+
   return (
     <DashboardLayout
       title={project.name}
@@ -155,13 +173,8 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* KPI strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Budget', value: fmt(project.budget) },
-            { label: 'PO Spend', value: fmt(summary?.totalPOSpend) },
-            { label: "Today's Labour", value: summary?.todayLabourCount ?? 0 },
-            { label: 'Task Progress', value: `${taskPct}%` },
-          ].map(k => (
+        <div className={`grid gap-3 ${canSeeBudget ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
+          {kpiCards.map(k => (
             <div key={k.label} className="card px-4 py-3">
               <p className="text-[10px] text-stone-400 uppercase tracking-wide mb-1">{k.label}</p>
               <p className="text-xl font-semibold text-stone-800 font-display">{k.value}</p>
@@ -195,13 +208,20 @@ export default function ProjectDetailPage() {
           <div className="card p-4">
             <p className="section-title">Project Info</p>
             {project.description && <p className="text-xs text-stone-500 mb-3 leading-relaxed">{project.description}</p>}
-            <InfoRow label="Manager" value={project.manager?.name}/>
-            <InfoRow label="Client" value={project.client?.name}/>
-            <InfoRow label="Start Date" value={project.startDate ? format(new Date(project.startDate), 'dd MMM yyyy') : null}/>
-            <InfoRow label="End Date" value={project.endDate ? format(new Date(project.endDate), 'dd MMM yyyy') : null}/>
-            <InfoRow label="Address" value={project.address}/>
-            <InfoRow label="Geo-fence Lat" value={project.geofenceLat?.toFixed(6)}/>
-            <InfoRow label="Geo-fence Lng" value={project.geofenceLng?.toFixed(6)}/>
+            <InfoRow label="Manager"          value={project.manager?.name}/>
+            <InfoRow label="Client"           value={project.client?.name}/>
+            <InfoRow label="Start Date"       value={project.startDate ? format(new Date(project.startDate), 'dd MMM yyyy') : null}/>
+            <InfoRow label="End Date"         value={project.endDate   ? format(new Date(project.endDate),   'dd MMM yyyy') : null}/>
+            <InfoRow label="Address"          value={project.address}/>
+            {/* Budget rows — only for admin/finance */}
+            {canSeeBudget && (
+              <>
+                <InfoRow label="Budget"       value={fmt(project.budget)}/>
+                <InfoRow label="PO Spend"     value={fmt(summary?.totalPOSpend)}/>
+              </>
+            )}
+            <InfoRow label="Geo-fence Lat"    value={project.geofenceLat?.toFixed(6)}/>
+            <InfoRow label="Geo-fence Lng"    value={project.geofenceLng?.toFixed(6)}/>
             <InfoRow label="Geo-fence Radius" value={project.geofenceLat ? `${project.geofenceRadius}m` : null}/>
           </div>
 
@@ -218,13 +238,13 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* ── Payment Schedule ── */}
+        {/* Payment Schedule — only for admin/finance */}
         {canManagePayments && (
-         <PaymentScheduleManager
-  projectId={id}
-  tasks={tasks}
-  userRole={user.role}
-/>
+          <PaymentScheduleManager
+            projectId={id}
+            tasks={tasks}
+            userRole={user.role}
+          />
         )}
       </div>
 
