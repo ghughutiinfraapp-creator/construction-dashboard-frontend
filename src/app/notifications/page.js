@@ -17,8 +17,13 @@ const TYPE_META = {
   GENERAL:            { icon: '·', bg: 'bg-stone-100',  text: 'text-stone-600',  label: 'General'  },
 };
 
-function NotificationItem({ n, onMarkRead }) {
-  const meta = TYPE_META[n.type] || TYPE_META.GENERAL;
+const ENTITY_META = {
+  issue: { icon: '!', bg: 'bg-red-100', text: 'text-red-700', label: 'Issue' },
+};
+
+function NotificationItem({ n, onMarkRead, onPreviewPhoto }) {
+  const meta = ENTITY_META[n.entityType] || TYPE_META[n.type] || TYPE_META.GENERAL;
+  const photos = n.entityType === 'issue' ? (n.photoUrls || []) : [];
   return (
     <div onClick={() => !n.isRead && onMarkRead(n.id)}
       className={`flex items-start gap-3 px-5 py-4 border-b border-stone-50 last:border-0
@@ -45,6 +50,15 @@ function NotificationItem({ n, onMarkRead }) {
         <span className={`inline-block mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded ${meta.bg} ${meta.text}`}>
           {meta.label}
         </span>
+        {photos.length > 0 && (
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {photos.map((url, i) => (
+              <img key={i} src={url} alt={`Issue photo ${i + 1}`}
+                onClick={(e) => { e.stopPropagation(); onPreviewPhoto(url); }}
+                className="w-14 h-14 rounded-lg object-cover border border-stone-100 cursor-zoom-in hover:opacity-80 transition-opacity"/>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -57,6 +71,7 @@ export default function NotificationsPage() {
   } = useNotifications();
 
   const [unreadOnly, setUnreadOnly] = useState(false);
+  const [previewPhoto, setPreviewPhoto] = useState(null);
 
   useEffect(() => { load(1, { unreadOnly }); }, []);
 
@@ -120,7 +135,7 @@ export default function NotificationsPage() {
           ) : (
             <>
               {notifications.map(n => (
-                <NotificationItem key={n.id} n={n} onMarkRead={markRead} />
+                <NotificationItem key={n.id} n={n} onMarkRead={markRead} onPreviewPhoto={setPreviewPhoto} />
               ))}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-5 py-3 border-t border-stone-100 bg-stone-25">
@@ -145,6 +160,14 @@ export default function NotificationsPage() {
           )}
         </div>
       </div>
+
+      {previewPhoto && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-6"
+          onClick={() => setPreviewPhoto(null)}>
+          <img src={previewPhoto} alt="Issue photo"
+            className="max-w-full max-h-full rounded-lg shadow-2xl"/>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

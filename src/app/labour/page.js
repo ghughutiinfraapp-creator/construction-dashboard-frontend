@@ -13,18 +13,18 @@ import { useAuth } from '../../context/AuthContext';
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 
-const TRADE_TYPES = ['Mason','Carpenter','Electrician','Plumber','Painter',
-                     'Welder','Steel Fixer','Helper','Supervisor','Other'];
+const TRADE_TYPES = ['Mason', 'Carpenter', 'Electrician', 'Plumber', 'Painter',
+  'Welder', 'Steel Fixer', 'Helper', 'Supervisor', 'Other'];
 
 function PlusIcon() {
   return <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-    <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
   </svg>;
 }
 function SearchIcon() {
   return <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-stone-400">
-    <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4"/>
-    <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+    <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+    <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
   </svg>;
 }
 
@@ -38,9 +38,9 @@ export default function LabourPage() {
     markAttendance, loadWageReport,
   } = useLabour();
 
-  const [tab,      setTab]      = useState('labourers'); // 'labourers' | 'attendance' | 'wages'
+  const [tab, setTab] = useState('labourers'); // 'labourers' | 'attendance' | 'wages'
   const [projects, setProjects] = useState([]);
-  const [search,   setSearch]   = useState('');
+  const [search, setSearch] = useState('');
 
   // Filters
   const [filters, setFilters] = useState({ projectId: '', tradeType: '' });
@@ -49,19 +49,19 @@ export default function LabourPage() {
   const [wageFilters, setWageFilters] = useState({
     projectId: '',
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-    endDate:   format(new Date(), 'yyyy-MM-dd'),
+    endDate: format(new Date(), 'yyyy-MM-dd'),
   });
 
   // Modals
-  const [addOpen,      setAddOpen]      = useState(false);
-  const [attendOpen,   setAttendOpen]   = useState(false);
-  const [attendProject,setAttendProject]= useState('');
+  const [addOpen, setAddOpen] = useState(false);
+  const [attendOpen, setAttendOpen] = useState(false);
+  const [attendProject, setAttendProject] = useState('');
 
-  const canManage = user && ['SITE_ENGINEER','PROJECT_MANAGER','SUPER_ADMIN'].includes(user.role);
+  const canManage = user && ['SITE_ENGINEER', 'PROJECT_MANAGER', 'SUPER_ADMIN'].includes(user.role);
 
   useEffect(() => {
     projectsAPI.getAll({ limit: 100 })
-      .then(({ data }) => setProjects(data.projects)).catch(() => {});
+      .then(({ data }) => setProjects(data.projects)).catch(() => { });
     loadLabourers();
   }, []);
 
@@ -139,15 +139,14 @@ export default function LabourPage() {
         {/* ── Tab switch ── */}
         <div className="flex bg-stone-100 rounded-xl p-1 w-fit gap-1">
           {[
-            { key: 'labourers',  label: 'Labourers'    },
-            { key: 'wages',      label: 'Wage Report'  },
+            { key: 'labourers', label: 'Labourers' },
+            { key: 'wages', label: 'Wage Report' },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                tab === t.key
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === t.key
                   ? 'bg-white text-stone-800 shadow-sm'
                   : 'text-stone-400 hover:text-stone-600'
-              }`}>
+                }`}>
               {t.label}
             </button>
           ))}
@@ -159,7 +158,7 @@ export default function LabourPage() {
             {/* Filters */}
             <div className="flex flex-wrap gap-2 items-center">
               <div className="relative">
-                <div className="absolute left-2.5 top-1/2 -translate-y-1/2"><SearchIcon/></div>
+                <div className="absolute left-2.5 top-1/2 -translate-y-1/2"><SearchIcon /></div>
                 <input className="input pl-8 w-48 text-sm" placeholder="Search by name…"
                   value={search} onChange={e => setSearch(e.target.value)} />
               </div>
@@ -184,8 +183,8 @@ export default function LabourPage() {
               {(filters.projectId || filters.tradeType || search) && (
                 <button className="text-xs text-stone-400 hover:text-stone-600 underline underline-offset-2"
                   onClick={() => {
-                    setSearch(''); setFilters({ projectId:'', tradeType:'' });
-                    loadLabourers({ projectId:'', tradeType:'', search:'' });
+                    setSearch(''); setFilters({ projectId: '', tradeType: '' });
+                    loadLabourers({ projectId: '', tradeType: '', search: '' });
                   }}>
                   Clear
                 </button>
@@ -196,22 +195,22 @@ export default function LabourPage() {
             <div className="card overflow-hidden">
               {loading ? (
                 <div className="divide-y divide-stone-50">
-                  {[...Array(6)].map((_,i) => (
+                  {[...Array(6)].map((_, i) => (
                     <div key={i} className="flex gap-4 px-4 py-3">
-                      <div className="shimmer w-8 h-8 rounded-full flex-shrink-0"/>
-                      <div className="shimmer h-4 w-32 rounded"/>
-                      <div className="shimmer h-4 w-24 rounded"/>
-                      <div className="shimmer h-4 w-20 rounded ml-auto"/>
+                      <div className="shimmer w-8 h-8 rounded-full flex-shrink-0" />
+                      <div className="shimmer h-4 w-32 rounded" />
+                      <div className="shimmer h-4 w-24 rounded" />
+                      <div className="shimmer h-4 w-20 rounded ml-auto" />
                     </div>
                   ))}
                 </div>
               ) : labourers.length === 0 ? (
                 <EmptyState
                   icon={<svg width="44" height="44" viewBox="0 0 48 48" fill="none">
-                    <circle cx="24" cy="16" r="8" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M8 44c0-8.84 7.16-16 16-16s16 7.16 16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    <circle cx="38" cy="14" r="6" fill="white" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M38 11v3M38 17v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="24" cy="16" r="8" stroke="currentColor" strokeWidth="2" />
+                    <path d="M8 44c0-8.84 7.16-16 16-16s16 7.16 16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                    <circle cx="38" cy="14" r="6" fill="white" stroke="currentColor" strokeWidth="2" />
+                    <path d="M38 11v3M38 17v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>}
                   title="No labourers found"
                   description={filters.projectId || filters.tradeType || search
@@ -227,7 +226,7 @@ export default function LabourPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-stone-100 bg-stone-25">
-                      {['Name','Trade','Project','Daily Wage','Phone'].map(h => (
+                      {['Name', 'Trade', 'Project', 'Daily Wage', 'Phone', 'Aadhaar'].map(h => (
                         <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
                                                text-stone-400 uppercase tracking-wide whitespace-nowrap">
                           {h}
@@ -242,7 +241,7 @@ export default function LabourPage() {
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                               <span className="text-amber-700 text-[10px] font-semibold">
-                                {l.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+                                {l.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                               </span>
                             </div>
                             <span className="text-sm font-medium text-stone-800">{l.name}</span>
@@ -264,6 +263,11 @@ export default function LabourPage() {
                         <td className="px-4 py-3">
                           <span className="text-xs text-stone-500 font-mono">
                             {l.phone || '—'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-stone-500 font-mono">
+                            {l.aadhaar || '—'}
                           </span>
                         </td>
                       </tr>
