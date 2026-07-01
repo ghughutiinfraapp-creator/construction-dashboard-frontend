@@ -4,11 +4,11 @@ import { deliveriesAPI } from '../lib/api';
 import toast from 'react-hot-toast';
 
 export function useDeliveries() {
-  const [deliveries,  setDeliveries]  = useState([]);
-  const [total,       setTotal]       = useState(0);
-  const [totalPages,  setTotalPages]  = useState(1);
-  const [page,        setPage]        = useState(1);
-  const [loading,     setLoading]     = useState(false);
+  const [deliveries, setDeliveries] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
 
   const filtersRef = useRef({ status: '' });
 
@@ -30,6 +30,7 @@ export function useDeliveries() {
       setLoading(false);
     }
   }, []);
+
 
   // Verify a delivery (site engineer / PM)
   const verify = async (id, payload) => {
