@@ -1,8 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import Modal from '../../components/ui/Modal';
+import TaskForm from '../../components/tasks/TaskForm';
 import { useNotifications } from '../../hooks/useNotifications';
+import { tasksAPI } from '../../lib/api';
 import { formatDistanceToNow } from 'date-fns';
+import toast from 'react-hot-toast';
 
 const TYPE_META = {
   TASK_ASSIGNED:      { icon: '◻', bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'Task'     },
@@ -21,9 +25,13 @@ const ENTITY_META = {
   issue: { icon: '!', bg: 'bg-red-100', text: 'text-red-700', label: 'Issue' },
 };
 
-function NotificationItem({ n, onMarkRead, onPreviewPhoto }) {
+function NotificationItem({ n, onMarkRead, onPreviewPhoto, onCreateTask }) {
   const meta = ENTITY_META[n.entityType] || TYPE_META[n.type] || TYPE_META.GENERAL;
-  const photos = n.entityType === 'issue' ? (n.photoUrls || []) : [];
+  const photos = (n.entityType === 'issue' || n.entityType === 'delivery')
+    ? (n.photoUrls || [])
+    : [];
+  const isIssue = n.entityType === 'issue';
+
   return (
     <div onClick={() => !n.isRead && onMarkRead(n.id)}
       className={`flex items-start gap-3 px-5 py-4 border-b border-stone-50 last:border-0
@@ -47,9 +55,19 @@ function NotificationItem({ n, onMarkRead, onPreviewPhoto }) {
           </div>
         </div>
         <p className="text-xs text-stone-400 mt-0.5 leading-relaxed">{n.body}</p>
-        <span className={`inline-block mt-1.5 text-[10px] font-medium px-1.5 py-0.5 rounded ${meta.bg} ${meta.text}`}>
-          {meta.label}
-        </span>
+        <div className="flex items-center gap-2 mt-1.5">
+          <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded ${meta.bg} ${meta.text}`}>
+            {meta.label}
+          </span>
+          {isIssue && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onCreateTask(n); }}
+              className="text-[10px] font-medium px-2 py-0.5 rounded bg-stone-800 text-white hover:bg-stone-700 transition-colors"
+            >
+              + Create Task
+            </button>
+          )}
+        </div>
         {photos.length > 0 && (
           <div className="flex gap-2 mt-2 flex-wrap">
             {photos.map((url, i) => (
@@ -72,6 +90,7 @@ export default function NotificationsPage() {
 
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState(null);
+  const [taskIssue, setTaskIssue] = useState(null); // notification currently being turned into a task
 
   useEffect(() => { load(1, { unreadOnly }); }, []);
 
@@ -81,8 +100,23 @@ export default function NotificationsPage() {
     load(1, { unreadOnly: val });
   };
 
+  const handleCreateTaskFromIssue = async (data) => {
+    await tasksAPI.create(data);
+    toast.success('Task created from issue');
+    setTaskIssue(null);
+  };
+
   const from = total === 0 ? 0 : (page - 1) * 15 + 1;
   const to   = Math.min(page * 15, total);
+
+  // Build TaskForm's `initial` shape from the selected issue notification
+  const taskFormInitial = taskIssue ? {
+    title:       taskIssue.issueTitle ? `Fix: ${taskIssue.issueTitle}` : taskIssue.title,
+    description: taskIssue.issueDescription || taskIssue.body || '',
+    projectId:   taskIssue.issueProjectId || '',
+    priority:    'HIGH',
+    status:      'NOT_STARTED',
+  } : null;
 
   return (
     <DashboardLayout
@@ -135,7 +169,13 @@ export default function NotificationsPage() {
           ) : (
             <>
               {notifications.map(n => (
-                <NotificationItem key={n.id} n={n} onMarkRead={markRead} onPreviewPhoto={setPreviewPhoto} />
+                <NotificationItem
+                  key={n.id}
+                  n={n}
+                  onMarkRead={markRead}
+                  onPreviewPhoto={setPreviewPhoto}
+                  onCreateTask={setTaskIssue}
+                />
               ))}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between px-5 py-3 border-t border-stone-100 bg-stone-25">
@@ -168,6 +208,17 @@ export default function NotificationsPage() {
             className="max-w-full max-h-full rounded-lg shadow-2xl"/>
         </div>
       )}
+
+      {/* ── CREATE TASK FROM ISSUE MODAL ── */}
+      <Modal open={!!taskIssue} onClose={() => setTaskIssue(null)} title="Create Task for Issue" width="max-w-xl">
+        {taskIssue && (
+          <TaskForm
+            initial={taskFormInitial}
+            onSubmit={handleCreateTaskFromIssue}
+            onCancel={() => setTaskIssue(null)}
+          />
+        )}
+      </Modal>
     </DashboardLayout>
   );
 }

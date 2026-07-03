@@ -18,6 +18,7 @@ const NAV = [
       { href: '/tasks', label: 'Tasks', icon: TaskIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','SITE_ENGINEER'] },
       { href: '/attendance', label: 'Attendance', icon: AttendIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','SITE_ENGINEER'] },
       { href: '/labour', label: 'Labour', icon: LabourIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','SITE_ENGINEER'] },
+      { href: '/site-maps', label: 'Site Maps', icon: SiteMapIcon, roles: ['PROJECT_MANAGER'] },
     ]
   },
   {
@@ -143,6 +144,14 @@ function LabourIcon({ size, active }) {
     <path d="M1 13.5c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke={c} strokeWidth="1.3" strokeLinecap="round"/>
     <circle cx="12" cy="5" r="2" stroke={c} strokeWidth="1.2"/>
     <path d="M14 13.5c0-2.21-1-4-3-4.5" stroke={c} strokeWidth="1.2" strokeLinecap="round"/>
+  </svg>;
+}
+function SiteMapIcon({ size, active }) {
+  const c = active ? 'white' : '#A8A29E';
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <path d="M1 3l4.5-1.5L10 3l4.5-1.5V12L10 13.5 5.5 12 1 13.5V3z" stroke={c} strokeWidth="1.3" strokeLinejoin="round"/>
+    <path d="M5.5 1.5V12M10 3v10.5" stroke={c} strokeWidth="1.2"/>
+    <circle cx="7.5" cy="7" r="1.3" fill={active ? '#FBBF24' : '#D6D3D1'}/>
   </svg>;
 }
 function POIcon({ size, active }) {

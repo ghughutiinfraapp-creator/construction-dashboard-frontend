@@ -153,6 +153,15 @@ export const notificationsAPI = {
   markAllRead: () => api.put('/notifications/read-all'),
 };
 
+// ─── PHOTOS ────────────────────────────────────────────────────────────
+// Thin wrapper around GET /api/photos and GET /api/photos/:id.
+// Used by the Site Maps page (filters via entityType: 'SITE_MAP') and can
+// be reused anywhere else photos need to be listed (galleries, task photos).
+export const photosAPI = {
+  getAll: (params) => api.get('/photos', { params }),
+  getById: (id) => api.get(`/photos/${id}`),
+};
+
 // ─── UPLOADS ─────────────────────────────────────────────────────────
 export const uploadsAPI = {
   uploadPhoto: (file, type = 'photos') => {
@@ -169,6 +178,33 @@ export const uploadsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  // Uploads a single photo AND creates its DB record in one call, by
+  // POSTing to /api/uploads/photo with the metadata fields the backend's
+  // savePhotoRecord() requires (projectId, entityType) in the body.
+  //
+  // Field order matters for the mobile app (React Native drops fields
+  // appended after the file), so we always append metadata BEFORE the
+  // file here too, to stay consistent with that contract.
+  uploadPhotoWithMeta: (file, { projectId, entityType, entityId, taskId, caption } = {}) => {
+    const formData = new FormData();
+    if (projectId)  formData.append('projectId', projectId);
+    if (entityType) formData.append('entityType', entityType);
+    if (entityId)   formData.append('entityId', entityId);
+    if (taskId)     formData.append('taskId', taskId);
+    if (caption)    formData.append('caption', caption);
+    formData.append('file', file); // file must be appended last
+    return api.post('/uploads/photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  // Convenience wrapper for the Site Maps page.
+  uploadSiteMap: (file, projectId, caption) =>
+    uploadsAPI.uploadPhotoWithMeta(file, {
+      projectId,
+      entityType: 'SITE_MAP',
+      entityId: projectId,
+      caption,
+    }),
 };
 
 // ─── MATERIALS ───────────────────────────────────────────────────────
