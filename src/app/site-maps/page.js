@@ -90,26 +90,41 @@ export default function SiteMapsPage() {
   };
 
   // ── Upload handling ────────────────────────────────────────────────────
-  const handleFiles = async (fileList) => {
-    const files = Array.from(fileList || []).filter(f => f.type.startsWith('image/'));
-    if (!files.length || !selectedProjectId) return;
+ const handleFiles = async (fileList) => {
+  const files = Array.from(fileList || []).filter(
+    (f) => f.type.startsWith("image/") || f.type === "application/pdf"
+  );
 
-    setUploading(true);
-    setUploadError('');
-    try {
-      for (const file of files) {
-        await uploadsAPI.uploadSiteMap(file, selectedProjectId, caption || undefined);
-      }
-      setCaption('');
-      await loadMaps(selectedProjectId);
-    } catch (err) {
-      setUploadError(
-        err.friendlyMessage || err.response?.data?.error || 'Upload failed. Please try again.'
+  if (!files.length || !selectedProjectId) return;
+
+  setUploading(true);
+  setUploadError("");
+
+  try {
+    for (const file of files) {
+      await uploadsAPI.uploadSiteMap(
+        file,
+        selectedProjectId,
+        caption || undefined
       );
     }
-    setUploading(false);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
+
+    setCaption("");
+    await loadMaps(selectedProjectId);
+  } catch (err) {
+    setUploadError(
+      err.friendlyMessage ||
+        err.response?.data?.error ||
+        "Upload failed. Please try again."
+    );
+  }
+
+  setUploading(false);
+
+  if (fileInputRef.current) {
+    fileInputRef.current.value = "";
+  }
+};
 
   const onDrop = (e) => {
     e.preventDefault();
@@ -177,7 +192,7 @@ export default function SiteMapsPage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 multiple
                 className="hidden"
                 onChange={(e) => handleFiles(e.target.files)}
@@ -228,16 +243,31 @@ export default function SiteMapsPage() {
                 {maps.map(photo => (
                   <button
                     key={photo.id}
-                    onClick={() => setLightboxUrl(photo.url)}
+                    onClick={() => {
+  if (photo.url.toLowerCase().includes(".pdf")) {
+    window.open(photo.url, "_blank");
+  } else {
+    setLightboxUrl(photo.url);
+  }
+}}
                     className="card p-0 overflow-hidden text-left group"
                   >
-                    <div className="aspect-[4/3] bg-stone-100 overflow-hidden">
-                      <img
-                        src={photo.url}
-                        alt={photo.caption || 'Site map'}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                      />
-                    </div>
+                    <div className="aspect-[4/3] bg-stone-100 overflow-hidden flex items-center justify-center">
+  {photo.url.toLowerCase().includes(".pdf") ? (
+    <div className="flex flex-col items-center justify-center h-full w-full bg-red-50">
+      <div className="text-5xl">📄</div>
+      <span className="text-sm font-medium text-red-700 mt-2">
+        PDF Document
+      </span>
+    </div>
+  ) : (
+    <img
+      src={photo.url}
+      alt={photo.caption || "Site map"}
+      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+    />
+  )}
+</div>
                     <div className="p-2.5">
                       <p className="text-xs font-medium text-stone-700 truncate">
                         {photo.caption || 'Untitled map'}

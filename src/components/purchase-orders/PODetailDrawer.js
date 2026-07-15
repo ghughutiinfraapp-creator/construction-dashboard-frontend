@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { purchaseOrdersAPI } from '../../lib/api';
 import Badge from '../ui/Badge';
 import { format } from 'date-fns';
+import { PrintPOButton } from './Printablepo';
 
 function fmt(n) {
   if (!n) return '—';
@@ -22,6 +23,16 @@ function Row({ label, value }) {
     </div>
   );
 }
+
+// Optional: fill in your org's letterhead details for the printed PDF.
+// You could also load this from context/config instead of hardcoding it here.
+const COMPANY_INFO = {
+  name: 'Ghughuti Infra',
+  address: '',
+  gstin: '',
+  phone: '',
+  email: '',
+};
 
 export default function PODetailDrawer({ poId, onClose }) {
   const [po,      setPo]      = useState(null);
@@ -55,12 +66,21 @@ export default function PODetailDrawer({ poId, onClose }) {
             </h2>
             {!loading && po && <Badge status={po.status} dot className="mt-1" />}
           </div>
-          <button onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-stone-100 text-stone-400">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            {!loading && po && (
+              <div className='flex cursor-pointer border-2 rounded-lg w-20 px-2'>
+              <p className='font-bold text-md'>Print</p>
+              <PrintPOButton po={po} company={COMPANY_INFO} className='' />
+              </div>
+              
+            )}
+            <button onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-stone-100 text-stone-400">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Body */}
