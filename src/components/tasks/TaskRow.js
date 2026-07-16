@@ -66,6 +66,17 @@ function ChevronRightIcon({ open }) {
   );
 }
 
+// Small red note shown wherever a status is BLOCKED and a reason exists
+function BlockReasonNote({ reason, className = '' }) {
+  if (!reason) return null;
+  return (
+    <div className={`flex items-start gap-1.5 text-[11px] text-red-600 bg-red-50 rounded-md px-2 py-1 ${className}`}>
+      <span className="font-medium shrink-0">Blocked:</span>
+      <span className="text-red-500 line-clamp-2">{reason}</span>
+    </div>
+  );
+}
+
 // Clickable status pill with a transition dropdown for subtasks
 function SubtaskStatusPicker({ status, onChange }) {
   const [open, setOpen] = useState(false);
@@ -130,6 +141,12 @@ export default function TaskRow({ task, onStatusChange, onSubtaskStatusChange, o
   const [subtasks, setSubtasks] = useState(task.subtasks ?? []);
   const dotsRef = useRef(null);
 
+  // Keep local subtasks in sync whenever the parent refetches (e.g. after
+  // a block-reason is saved via a follow-up PUT /tasks/:id)
+  useEffect(() => {
+    setSubtasks(task.subtasks ?? []);
+  }, [task.subtasks]);
+
   const transitions = STATUS_TRANSITIONS[task.status] || [];
   const overdue  = task.dueDate && isPast(new Date(task.dueDate))  && !DONE.includes(task.status);
   const dueToday = task.dueDate && isToday(new Date(task.dueDate)) && !DONE.includes(task.status);
@@ -173,6 +190,9 @@ export default function TaskRow({ task, onStatusChange, onSubtaskStatusChange, o
               {task.project && (
                 <p className="text-[11px] text-stone-400 mt-0.5 truncate">{task.project.name}</p>
               )}
+              {task.status === 'BLOCKED' && (
+                <BlockReasonNote reason={task.remark} className="mt-1 max-w-xs" />
+              )}
               {hasSubtasks && (
                 <button
                   onClick={() => setExpanded(p => !p)}
@@ -193,7 +213,7 @@ export default function TaskRow({ task, onStatusChange, onSubtaskStatusChange, o
 
         {/* Status */}
         <td className="px-4 py-3 whitespace-nowrap">
-          <Badge status={task.status} dot />
+          <Badge status={task.status} dot title={task.status === 'BLOCKED' ? task.remark : undefined} />
         </td>
 
         {/* Priority */}
@@ -298,24 +318,29 @@ export default function TaskRow({ task, onStatusChange, onSubtaskStatusChange, o
       {expanded && hasSubtasks && (
         <tr className="bg-stone-25 border-b border-stone-50">
           <td colSpan={6} className="px-4 py-0">
-            <div className="ml-5 border-l-2 border-stone-100 py-2 pl-4 space-y-0.5">
+            <div className="ml-5 border-l-2 border-stone-100 py-2 pl-4 space-y-1">
               {subtasks.map(sub => {
                 const isDone = DONE.includes(sub.status);
                 return (
-                  <div key={sub.id} className="flex items-center gap-2.5 py-1.5 pr-2">
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[sub.status] ?? 'bg-stone-300'}`} />
-                    <span className={`flex-1 text-xs min-w-0 truncate ${isDone ? 'line-through text-stone-300' : 'text-stone-600'}`}>
-                      {sub.title}
-                    </span>
-                    {sub.assignedTo && (
-                      <span className="text-[10px] text-stone-400 flex-shrink-0 hidden sm:block">
-                        {sub.assignedTo.name}
+                  <div key={sub.id} className="py-0.5">
+                    <div className="flex items-center gap-2.5 py-1 pr-2">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[sub.status] ?? 'bg-stone-300'}`} />
+                      <span className={`flex-1 text-xs min-w-0 truncate ${isDone ? 'line-through text-stone-300' : 'text-stone-600'}`}>
+                        {sub.title}
                       </span>
+                      {sub.assignedTo && (
+                        <span className="text-[10px] text-stone-400 flex-shrink-0 hidden sm:block">
+                          {sub.assignedTo.name}
+                        </span>
+                      )}
+                      <SubtaskStatusPicker
+                        status={sub.status}
+                        onChange={next => handleSubtaskStatus(sub, next)}
+                      />
+                    </div>
+                    {sub.status === 'BLOCKED' && (
+                      <BlockReasonNote reason={sub.remark} className="ml-3.5 max-w-md" />
                     )}
-                    <SubtaskStatusPicker
-                      status={sub.status}
-                      onChange={next => handleSubtaskStatus(sub, next)}
-                    />
                   </div>
                 );
               })}

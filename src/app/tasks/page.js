@@ -1,10 +1,11 @@
 'use client';
-import { useState, useEffect, useCallback,useRef  } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import TaskCard from '../../components/tasks/TaskCard';
 import TaskRow from '../../components/tasks/TaskRow';
 import TaskForm from '../../components/tasks/TaskForm';
 import TaskStatsBar from '../../components/tasks/TaskStatsBar';
+import BlockReasonModal from '../../components/tasks/BlockReasonModal';
 import Modal from '../../components/ui/Modal';
 import EmptyState from '../../components/ui/EmptyState';
 import Badge from '../../components/ui/Badge';
@@ -104,6 +105,12 @@ export default function TasksPage() {
   const [editTask,   setEditTask]   = useState(null);
   const [deleteTask, setDeleteTask] = useState(null);
 
+  // Block-reason flow — holds the pending block request.
+  // For subtasks we stash resolve/reject so the card/row's optimistic
+  // update can be reverted if the user cancels the modal.
+  // shape: { kind: 'task' | 'subtask', id, parentId, currentSubtasks, resolve, reject }
+  const [blockRequest, setBlockRequest] = useState(null);
+
   const canManage = user && ['SUPER_ADMIN', 'PROJECT_MANAGER'].includes(user.role);
   const totalPages = Math.ceil(total / 20);
 
@@ -116,26 +123,25 @@ export default function TasksPage() {
   }, []);
 
   // Debounced search
-// Replace the search useEffect with this:
-const prevSearch = useRef(search);
+  const prevSearch = useRef(search);
 
-useEffect(() => {
-  if (prevSearch.current === search) return; // only fire when search actually changed
-  prevSearch.current = search;
+  useEffect(() => {
+    if (prevSearch.current === search) return; // only fire when search actually changed
+    prevSearch.current = search;
 
-  const t = setTimeout(() => {
-    const f = { ...filters, search };
+    const t = setTimeout(() => {
+      const f = { ...filters, search };
+      setFilters(f);
+      load(1, f);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applyFilter = (key, val) => {
+    const f = { ...filters, [key]: val };
     setFilters(f);
     load(1, f);
-  }, 350);
-  return () => clearTimeout(t);
-}, [search]); // eslint-disable-line react-hooks/exhaustive-deps
-
- const applyFilter = (key, val) => {
-  const f = { ...filters, [key]: val };
-  setFilters(f);
-  load(1, f);  // ✅ passes override — this is fine
-};
+  };
 
   const handleCreate = async (data) => {
     await create(data);
@@ -152,20 +158,64 @@ useEffect(() => {
     setDeleteTask(null);
   };
 
-  const handleStatusChange = async (id, status) => {
+  // ── Parent task status change ──────────────────────────────────────
+  const handleStatusChange = (id, status) => {
+    if (status === 'BLOCKED') {
+      setBlockRequest({ kind: 'task', id });
+      return;
+    }
+    (async () => {
+      try {
+        await updateStatus(id, status);
+      } catch {
+        toast.error('Failed to update status');
+      }
+    })();
+  };
+
+  // ── Subtask status change ──────────────────────────────────────────
+  // Returns a promise: TaskCard/TaskRow await it and revert their optimistic
+  // UI update if it rejects (e.g. user cancels the block-reason modal).
+  const handleSubtaskStatusChange = (subtaskId, parentId, status, currentSubtasks) => {
+    if (status === 'BLOCKED') {
+      return new Promise((resolve, reject) => {
+        setBlockRequest({ kind: 'subtask', id: subtaskId, parentId, currentSubtasks, resolve, reject });
+      });
+    }
+    return (async () => {
+      try {
+        await updateSubtaskStatus(subtaskId, parentId, status, currentSubtasks);
+      } catch {
+        toast.error('Failed to update sub-task status');
+        throw new Error('failed');
+      }
+    })();
+  };
+
+  // ── Confirm the block-reason modal: sets status then saves the reason ──
+  const confirmBlock = async (reason) => {
+    const req = blockRequest;
+    if (!req) return;
     try {
-      await updateStatus(id, status);
+      if (req.kind === 'task') {
+        await updateStatus(req.id, 'BLOCKED');
+        await update(req.id, { remark: reason });
+      } else {
+        await updateSubtaskStatus(req.id, req.parentId, 'BLOCKED', req.currentSubtasks);
+        await update(req.id, { remark: reason });
+        req.resolve?.();
+      }
     } catch {
-      toast.error('Failed to update status');
+      toast.error(`Failed to block ${req.kind === 'task' ? 'task' : 'sub-task'}`);
+      req.reject?.();
+    } finally {
+      setBlockRequest(null);
     }
   };
 
-  const handleSubtaskStatusChange = async (subtaskId, parentId, status, currentSubtasks) => {
-    try {
-      await updateSubtaskStatus(subtaskId, parentId, status, currentSubtasks);
-    } catch {
-      toast.error('Failed to update sub-task status');
-    }
+  const cancelBlock = () => {
+    blockRequest?.reject?.();
+    setBlockRequest(null);
   };
 
   // Group tasks by status for kanban
@@ -375,6 +425,15 @@ useEffect(() => {
       {/* ── DELETE CONFIRM MODAL ── */}
       <Modal open={!!deleteTask} onClose={() => setDeleteTask(null)} title="Delete Task" width="max-w-sm">
         <DeleteConfirm task={deleteTask} onConfirm={handleDelete} onCancel={() => setDeleteTask(null)} />
+      </Modal>
+
+      {/* ── BLOCK REASON MODAL ── */}
+      <Modal open={!!blockRequest} onClose={cancelBlock} title="Block Task" width="max-w-sm">
+        <BlockReasonModal
+          key={blockRequest ? `${blockRequest.kind}-${blockRequest.id}` : 'none'}
+          onConfirm={confirmBlock}
+          onCancel={cancelBlock}
+        />
       </Modal>
     </DashboardLayout>
   );

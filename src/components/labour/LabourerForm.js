@@ -16,7 +16,7 @@ function FieldError({ msg }) {
 export default function LabourerForm({ onSubmit, onCancel }) {
   const [form, setForm] = useState({
     name: '', phone: '', aadhaar: '',
-    tradeType: '', dailyWage: '', projectId: '',
+    tradeType: '', proposedAmount: '', projectId: '',
   });
   const [projects,   setProjects]   = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -34,11 +34,11 @@ export default function LabourerForm({ onSubmit, onCancel }) {
 
   const validate = () => {
     const e = {};
-    if (!form.name.trim())    e.name      = 'Name is required';
-    if (!form.tradeType)      e.tradeType = 'Trade type is required';
-    if (!form.dailyWage || isNaN(Number(form.dailyWage)) || Number(form.dailyWage) <= 0)
-                              e.dailyWage = 'Enter a valid daily wage';
-    if (!form.projectId)      e.projectId = 'Project is required';
+    if (!form.name.trim())      e.name           = 'Name is required';
+    if (!form.tradeType)        e.tradeType       = 'Trade type is required';
+    if (!form.proposedAmount || isNaN(Number(form.proposedAmount)) || Number(form.proposedAmount) <= 0)
+                                e.proposedAmount   = 'Enter a valid daily wage';
+    if (!form.projectId)        e.projectId       = 'Project is required';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -50,7 +50,7 @@ export default function LabourerForm({ onSubmit, onCancel }) {
     try {
       const payload = {
         ...form,
-        dailyWage: parseFloat(form.dailyWage),
+        proposedAmount: parseFloat(form.proposedAmount),
         phone:   form.phone   || undefined,
         aadhaar: form.aadhaar || undefined,
       };
@@ -97,10 +97,13 @@ export default function LabourerForm({ onSubmit, onCancel }) {
       <div>
         <label className="label">Daily Wage (₹) *</label>
         <input type="number" min="0" step="0.01" className="input"
-          value={form.dailyWage}
-          onChange={e => set('dailyWage', e.target.value)}
+          value={form.proposedAmount}
+          onChange={e => set('proposedAmount', e.target.value)}
           placeholder="500" />
-        <FieldError msg={errors.dailyWage} />
+        <FieldError msg={errors.proposedAmount} />
+        <p className="text-[11px] text-stone-400 mt-1">
+          Paid automatically for each day marked Present (half for Half-Day).
+        </p>
       </div>
 
       {/* Phone + Aadhaar */}

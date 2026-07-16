@@ -108,6 +108,7 @@ export const taskCategoriesAPI = {
 };
 
 // ─── LABOUR ──────────────────────────────────────────────────────────
+
 export const labourAPI = {
   getLabourers: (params) => api.get('/labour/labourers', { params }),
   createLabourer: (data) => api.post('/labour/labourers', data),

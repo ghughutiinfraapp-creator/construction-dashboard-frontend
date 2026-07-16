@@ -6,7 +6,7 @@ import ProjectForm from '../../../components/projects/ProjectForm';
 import PaymentScheduleManager from '../../../components/projects/PaymentScheduleManager';
 import Modal from '../../../components/ui/Modal';
 import Badge from '../../../components/ui/Badge';
-import { projectsAPI, dashboardAPI, tasksAPI } from '../../../lib/api';
+import { projectsAPI, dashboardAPI, tasksAPI, labourAPI } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -49,6 +49,9 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState(null);
   const [summary, setSummary] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [labourCost, setLabourCost] = useState(0);       // lifetime total paid on this project
+  const [labourCount, setLabourCount] = useState(0);      // number of labourers on this project
+  const [todayLabourCost, setTodayLabourCost] = useState(0); // amount earned today specifically
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [geoOpen, setGeoOpen] = useState(false);
@@ -64,14 +67,35 @@ export default function ProjectDetailPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const [{ data: pd }, { data: sd }, { data: td }] = await Promise.all([
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+      const [{ data: pd }, { data: sd }, { data: td }, { data: ld }, { data: tad }] = await Promise.all([
         projectsAPI.getById(id),
         dashboardAPI.getProjectSummary(id),
         tasksAPI.getAll({ projectId: id, limit: 10 }),
+        labourAPI.getLabourers({ projectId: id }),
+        labourAPI.getAttendance({ projectId: id, date: todayStr }),
       ]);
       setProject(pd.project);
       setSummary(sd);
       setTasks(td.tasks);
+
+      // Lifetime labour cost + headcount for this project (amountPaid is
+      // computed server-side from attendance, so this is always accurate)
+      const projectLabourers = ld.labourers || [];
+      setLabourCost(projectLabourers.reduce((sum, l) => sum + Number(l.amountPaid || 0), 0));
+      setLabourCount(projectLabourers.length);
+
+      // Amount actually earned by labour today specifically
+      const todayRecords = tad.attendance || [];
+      const todayCost = todayRecords.reduce((sum, r) => {
+        const dailyWage = Number(r.labourer?.proposedAmount || 0);
+        if (r.status === 'PRESENT') return sum + dailyWage;
+        if (r.status === 'HALF_DAY') return sum + dailyWage / 2;
+        return sum;
+      }, 0);
+      setTodayLabourCost(todayCost);
+
       setGeoForm({
         geofenceLat: pd.project.geofenceLat ? String(pd.project.geofenceLat) : '',
         geofenceLng: pd.project.geofenceLng ? String(pd.project.geofenceLng) : '',
@@ -132,18 +156,22 @@ export default function ProjectDetailPage() {
   // PO count from summary — shown to PM instead of budget
   const poCount = summary?.purchaseOrderCount ?? '—';
 
-  // KPI strip: Budget shown only to SUPER_ADMIN/FINANCE; PM sees PO Count instead
+  // KPI strip: Budget shown only to SUPER_ADMIN/FINANCE; PM sees PO Count instead.
+  // "Today's Labour" now shows amount spent today (not headcount) —
+  // Labour Cost shows the running lifetime total for this project.
   const kpiCards = canSeeBudget
     ? [
-        { label: 'Budget',          value: fmt(project.budget)          },
-        { label: 'PO Spend',        value: fmt(summary?.totalPOSpend)   },
-        { label: "Today's Labour",  value: summary?.todayLabourCount ?? 0 },
-        { label: 'Task Progress',   value: `${taskPct}%`                },
+        { label: 'Budget',            value: fmt(project.budget)   },
+        { label: 'PO Spend',          value: fmt(summary?.totalPOSpend) },
+        // { label: 'Labour Cost',       value: fmt(labourCost)       },
+        { label: "Cost Spent on Labour",    value: fmt(todayLabourCost)  },
+        { label: 'Task Progress',     value: `${taskPct}%`         },
       ]
     : [
-        { label: 'Purchase Orders', value: poCount                      },
-        { label: "Today's Labour",  value: summary?.todayLabourCount ?? 0 },
-        { label: 'Task Progress',   value: `${taskPct}%`                },
+        { label: 'Purchase Orders',   value: poCount                },
+        // { label: 'Labour Cost',       value: fmt(labourCost)        },
+        { label:  "Cost Spent on Labour",value: fmt(todayLabourCost)   },
+        { label: 'Task Progress',     value: `${taskPct}%`          },
       ];
 
   return (
@@ -173,7 +201,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* KPI strip */}
-        <div className={`grid gap-3 ${canSeeBudget ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'}`}>
+        <div className={`grid gap-3 ${canSeeBudget ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'}`}>
           {kpiCards.map(k => (
             <div key={k.label} className="card px-4 py-3">
               <p className="text-[10px] text-stone-400 uppercase tracking-wide mb-1">{k.label}</p>
@@ -208,21 +236,24 @@ export default function ProjectDetailPage() {
           <div className="card p-4">
             <p className="section-title">Project Info</p>
             {project.description && <p className="text-xs text-stone-500 mb-3 leading-relaxed">{project.description}</p>}
-            <InfoRow label="Manager"          value={project.manager?.name}/>
-            <InfoRow label="Client"           value={project.client?.name}/>
-            <InfoRow label="Start Date"       value={project.startDate ? format(new Date(project.startDate), 'dd MMM yyyy') : null}/>
-            <InfoRow label="End Date"         value={project.endDate   ? format(new Date(project.endDate),   'dd MMM yyyy') : null}/>
-            <InfoRow label="Address"          value={project.address}/>
+            <InfoRow label="Manager"           value={project.manager?.name}/>
+            <InfoRow label="Client"            value={project.client?.name}/>
+            <InfoRow label="Start Date"        value={project.startDate ? format(new Date(project.startDate), 'dd MMM yyyy') : null}/>
+            <InfoRow label="End Date"          value={project.endDate   ? format(new Date(project.endDate),   'dd MMM yyyy') : null}/>
+            <InfoRow label="Address"           value={project.address}/>
+            <InfoRow label="Labour Cost"       value={fmt(labourCost)}/>
+            <InfoRow label="Today's Labour"    value={fmt(todayLabourCost)}/>
+            <InfoRow label="Labourers"         value={labourCount ? String(labourCount) : null}/>
             {/* Budget rows — only for admin/finance */}
             {canSeeBudget && (
               <>
-                <InfoRow label="Budget"       value={fmt(project.budget)}/>
-                <InfoRow label="PO Spend"     value={fmt(summary?.totalPOSpend)}/>
+                <InfoRow label="Budget"        value={fmt(project.budget)}/>
+                <InfoRow label="PO Spend"      value={fmt(summary?.totalPOSpend)}/>
               </>
             )}
-            <InfoRow label="Geo-fence Lat"    value={project.geofenceLat?.toFixed(6)}/>
-            <InfoRow label="Geo-fence Lng"    value={project.geofenceLng?.toFixed(6)}/>
-            <InfoRow label="Geo-fence Radius" value={project.geofenceLat ? `${project.geofenceRadius}m` : null}/>
+            <InfoRow label="Geo-fence Lat"     value={project.geofenceLat?.toFixed(6)}/>
+            <InfoRow label="Geo-fence Lng"     value={project.geofenceLng?.toFixed(6)}/>
+            <InfoRow label="Geo-fence Radius"  value={project.geofenceLat ? `${project.geofenceRadius}m` : null}/>
           </div>
 
           {/* Recent tasks */}

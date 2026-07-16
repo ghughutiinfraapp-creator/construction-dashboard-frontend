@@ -84,6 +84,17 @@ function ChevronDownIcon() {
   );
 }
 
+// Small red note shown wherever a status is BLOCKED and a reason exists
+function BlockReasonNote({ reason, className = '' }) {
+  if (!reason) return null;
+  return (
+    <div className={`flex items-start gap-1.5 text-[11px] text-red-600 bg-red-50 rounded-md px-2 py-1 ${className}`}>
+      <span className="font-medium shrink-0">Blocked:</span>
+      <span className="text-red-500 line-clamp-2">{reason}</span>
+    </div>
+  );
+}
+
 // Clickable status pill with a transition dropdown for subtasks
 function SubtaskStatusPicker({ status, onChange }) {
   const [open, setOpen] = useState(false);
@@ -145,6 +156,12 @@ export default function TaskCard({ task, onStatusChange, onSubtaskStatusChange, 
   const [menuOpen, setMenuOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [subtasks, setSubtasks] = useState(task.subtasks ?? []);
+
+  // Keep local subtasks in sync whenever the parent refetches (e.g. after
+  // a block-reason is saved via a follow-up PUT /tasks/:id)
+  useEffect(() => {
+    setSubtasks(task.subtasks ?? []);
+  }, [task.subtasks]);
 
   const transitions = STATUS_TRANSITIONS[task.status] || [];
   const overdue  = task.dueDate && isPast(new Date(task.dueDate))  && !DONE.includes(task.status);
@@ -247,6 +264,11 @@ export default function TaskCard({ task, onStatusChange, onSubtaskStatusChange, 
         <Badge status={task.priority} />
       </div>
 
+      {/* ── Block reason (parent task) ── */}
+      {task.status === 'BLOCKED' && (
+        <BlockReasonNote reason={task.remark} />
+      )}
+
       {/* ── Sub-task progress ── */}
       {hasSubtasks && (
         <div>
@@ -267,19 +289,24 @@ export default function TaskCard({ task, onStatusChange, onSubtaskStatusChange, 
 
           {/* Expanded subtask list */}
           {expanded && (
-            <div className="mt-2 space-y-1 border-t border-stone-50 pt-2 animate-fade-in">
+            <div className="mt-2 space-y-1.5 border-t border-stone-50 pt-2 animate-fade-in">
               {subtasks.map(sub => {
                 const isDone = DONE.includes(sub.status);
                 return (
-                  <div key={sub.id} className="flex items-center gap-2">
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[sub.status] ?? 'bg-stone-300'}`} />
-                    <span className={`flex-1 text-[11px] min-w-0 truncate ${isDone ? 'line-through text-stone-300' : 'text-stone-600'}`}>
-                      {sub.title}
-                    </span>
-                    <SubtaskStatusPicker
-                      status={sub.status}
-                      onChange={next => handleSubtaskStatus(sub, next)}
-                    />
+                  <div key={sub.id} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[sub.status] ?? 'bg-stone-300'}`} />
+                      <span className={`flex-1 text-[11px] min-w-0 truncate ${isDone ? 'line-through text-stone-300' : 'text-stone-600'}`}>
+                        {sub.title}
+                      </span>
+                      <SubtaskStatusPicker
+                        status={sub.status}
+                        onChange={next => handleSubtaskStatus(sub, next)}
+                      />
+                    </div>
+                    {sub.status === 'BLOCKED' && (
+                      <BlockReasonNote reason={sub.remark} className="ml-3.5" />
+                    )}
                   </div>
                 );
               })}

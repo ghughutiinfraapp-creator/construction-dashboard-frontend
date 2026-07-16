@@ -38,7 +38,7 @@ export default function LabourPage() {
     markAttendance, loadWageReport,
   } = useLabour();
 
-  const [tab, setTab] = useState('labourers'); // 'labourers' | 'attendance' | 'wages'
+  const [tab, setTab] = useState('labourers'); // 'labourers' | 'wages'
   const [projects, setProjects] = useState([]);
   const [search, setSearch] = useState('');
 
@@ -82,7 +82,7 @@ export default function LabourPage() {
 
   const handleAddLabourer = async (payload) => {
     try {
-      await addLabourer(payload);
+      await addLabourer(payload); // hook already toasts success
       setAddOpen(false);
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to add labourer');
@@ -94,6 +94,8 @@ export default function LabourPage() {
     try {
       await markAttendance(payload);
       setAttendOpen(false);
+      // Marking attendance changes amountPaid (computed on the backend) — refresh so the table/cards reflect it
+      loadLabourers(labFiltersRef.current);
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to save attendance');
       throw err;
@@ -112,6 +114,10 @@ export default function LabourPage() {
   const projectLabourers = attendProject
     ? labourers.filter(l => l.project?.id === attendProject || l.projectId === attendProject)
     : labourers;
+
+  // Payroll summary across the currently filtered labourers
+  const totalDailyPayroll = labourers.reduce((sum, l) => sum + Number(l.proposedAmount || 0), 0);
+  const totalAmountPaid = labourers.reduce((sum, l) => sum + Number(l.amountPaid || 0), 0);
 
   return (
     <DashboardLayout
@@ -155,6 +161,8 @@ export default function LabourPage() {
         {/* ══ LABOURERS TAB ══ */}
         {tab === 'labourers' && (
           <>
+            
+
             {/* Filters */}
             <div className="flex flex-wrap gap-2 items-center">
               <div className="relative">
@@ -223,57 +231,68 @@ export default function LabourPage() {
                   )}
                 />
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-stone-100 bg-stone-25">
-                      {['Name', 'Trade', 'Project', 'Daily Wage', 'Phone', 'Aadhaar'].map(h => (
-                        <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
-                                               text-stone-400 uppercase tracking-wide whitespace-nowrap">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {labourers.map(l => (
-                      <tr key={l.id} className="border-b border-stone-50 hover:bg-stone-25 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                              <span className="text-amber-700 text-[10px] font-semibold">
-                                {l.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                              </span>
-                            </div>
-                            <span className="text-sm font-medium text-stone-800">{l.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="badge bg-stone-100 text-stone-600">{l.tradeType}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-stone-500 truncate block max-w-[140px]">
-                            {l.project?.name}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs font-mono font-medium text-stone-700">
-                            ₹{Number(l.dailyWage).toLocaleString()}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-stone-500 font-mono">
-                            {l.phone || '—'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="text-xs text-stone-500 font-mono">
-                            {l.aadhaar || '—'}
-                          </span>
-                        </td>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-stone-100 bg-stone-25">
+                        {['Name', 'Trade', 'Project', 'Daily Wage', 'Phone', 'Aadhaar'].map(h => (
+                          <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
+                                                 text-stone-400 uppercase tracking-wide whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {labourers.map(l => {
+                        const dailyWage = Number(l.proposedAmount || 0);
+                        const paid = Number(l.amountPaid || 0);
+                        return (
+                          <tr key={l.id} className="border-b border-stone-50 hover:bg-stone-25 transition-colors">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                  <span className="text-amber-700 text-[10px] font-semibold">
+                                    {l.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                  </span>
+                                </div>
+                                <span className="text-sm font-medium text-stone-800">{l.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="badge bg-stone-100 text-stone-600">{l.tradeType}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-stone-500 truncate block max-w-[140px]">
+                                {l.project?.name}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs font-mono font-medium text-stone-700">
+                                ₹{dailyWage.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs font-mono font-medium text-green-700">
+                                ₹{paid.toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-stone-500 font-mono">
+                                {l.phone || '—'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-stone-500 font-mono">
+                                {l.aadhaar || '—'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </>
