@@ -31,7 +31,6 @@ export function useDeliveries() {
     }
   }, []);
 
-
   // Verify a delivery (site engineer / PM)
   const verify = async (id, payload) => {
     // payload: { verified: true } or { verified: false, issueDescription, issuePhotoUrl }
