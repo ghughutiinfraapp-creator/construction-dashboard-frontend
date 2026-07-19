@@ -43,7 +43,6 @@ export function useDeliveries() {
       prev.map(d => d.id === id ? { ...d, status: newStatus } : d)
     );
   };
-
   return {
     deliveries, total, totalPages, page, loading,
     filtersRef, load, verify,
