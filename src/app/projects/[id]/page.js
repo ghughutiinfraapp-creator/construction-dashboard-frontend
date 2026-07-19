@@ -161,7 +161,7 @@ export default function ProjectDetailPage() {
   // Labour Cost shows the running lifetime total for this project.
   const kpiCards = canSeeBudget
     ? [
-        { label: 'Budget',            value: fmt(project.budget)   },
+        { label: 'Estimated Budget',            value: fmt(project.budget)   },
         { label: 'PO Spend',          value: fmt(summary?.totalPOSpend) },
         // { label: 'Labour Cost',       value: fmt(labourCost)       },
         { label: "Cost Spent on Labour",    value: fmt(todayLabourCost)  },

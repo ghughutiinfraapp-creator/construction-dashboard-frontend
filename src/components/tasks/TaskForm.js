@@ -269,7 +269,7 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
           />
         </div>
         <div>
-          <label className="label">Due Date</label>
+          <label className="label">Estimated Due Date</label>
           <input
             type="date" className="input"
             value={form.dueDate}
