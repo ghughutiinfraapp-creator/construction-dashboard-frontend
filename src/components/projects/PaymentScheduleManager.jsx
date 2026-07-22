@@ -298,12 +298,15 @@ function InstallmentModal({ scheduleId, existing, tasks, onSave, onClose }) {
   );
 }
 
-// ─── Record Payment Modal ─────────────────────────────────────────────────────
+// ─── Record Payment Modal (manual amount-received entry, supports partial) ────
 
 function RecordPaymentModal({ scheduleId, installment, onSave, onClose }) {
-  const remaining = parseFloat(installment.amount) - parseFloat(installment.paidAmount ?? 0);
+  const alreadyPaid = parseFloat(installment.paidAmount ?? 0);
+  const instTotal   = parseFloat(installment.amount);
+  const remaining   = Math.max(0, instTotal - alreadyPaid);
+
   const [form, setForm] = useState({
-    amount:          remaining.toFixed(2),
+    amount:          remaining > 0 ? remaining.toFixed(2) : '',
     paymentDate:     new Date().toISOString().split('T')[0],
     paymentMode:     'BANK_TRANSFER',
     referenceNumber: '',
@@ -312,14 +315,32 @@ function RecordPaymentModal({ scheduleId, installment, onSave, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
 
+  const enteredAmount = parseFloat(form.amount || 0);
+  const newTotalPaid  = alreadyPaid + (enteredAmount > 0 ? enteredAmount : 0);
+  const newRemaining  = Math.max(0, instTotal - newTotalPaid);
+  const isPartial     = enteredAmount > 0 && newRemaining > 0.5;
+  const isOverpaying  = enteredAmount > remaining + 0.5;
+
   const handleSave = async () => {
+    setError('');
+    if (!form.amount || enteredAmount <= 0) return setError('Enter the amount received');
+    if (!form.paymentDate) return setError('Payment date is required');
+
     setSaving(true);
     try {
       const result = await paymentAPI.recordPayment(scheduleId, installment.id, {
-        ...form, amount: parseFloat(form.amount),
+        ...form, amount: enteredAmount,
       });
       if (result.error) throw new Error(result.error);
-      onSave(result);
+      // Prefer the updated installment from the API response; fall back to a
+      // locally-derived shape so the UI still reflects the partial payment
+      // immediately even if the backend only returns a bare success flag.
+      const updated = result.installment ?? {
+        ...installment,
+        paidAmount: newTotalPaid,
+        effectiveStatus: newRemaining <= 0.5 ? 'PAID' : 'PARTIAL',
+      };
+      onSave(updated);
     } catch (e) {
       setError(e.response?.data?.error || e.message);
     } finally {
@@ -331,7 +352,7 @@ function RecordPaymentModal({ scheduleId, installment, onSave, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box modal-box-sm" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <h2 className="modal-title">Record payment</h2>
+          <h2 className="modal-title">Record payment received</h2>
           <button className="icon-btn" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
@@ -339,10 +360,16 @@ function RecordPaymentModal({ scheduleId, installment, onSave, onClose }) {
             <span className="pay-meta-label">{installment.title}</span>
             <span className="pay-meta-remaining">Remaining: {inr(remaining)}</span>
           </div>
+          {alreadyPaid > 0 && (
+            <p className="field-hint" style={{ marginBottom: 12 }}>
+              {inr(alreadyPaid)} already received against this installment of {inr(instTotal)}.
+            </p>
+          )}
           <div className="inst-fields">
             <div className="field-group">
-              <label className="field-label">Amount received (₹) *</label>
-              <input type="number" className="field-input" value={form.amount}
+              <label className="field-label">Amount received now (₹) *</label>
+              <input type="number" className="field-input" placeholder="Enter amount paid by client"
+                value={form.amount}
                 onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} />
             </div>
             <div className="field-group">
@@ -366,10 +393,21 @@ function RecordPaymentModal({ scheduleId, installment, onSave, onClose }) {
             </div>
             <div className="field-group span-2">
               <label className="field-label">Notes</label>
-              <input className="field-input" value={form.notes}
-                onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
+              <input className="field-input" placeholder="Optional — e.g. reason for partial payment"
+                value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} />
             </div>
           </div>
+
+          {enteredAmount > 0 && (
+            <div className={`pay-preview ${isPartial ? 'pay-preview-partial' : 'pay-preview-full'}`}>
+              {isOverpaying
+                ? `This is ₹${(enteredAmount - remaining).toLocaleString('en-IN')} more than the remaining balance — please confirm this is correct.`
+                : isPartial
+                  ? `Partial payment — ${inr(newRemaining)} will still be due after this entry.`
+                  : `This will fully settle the installment.`}
+            </div>
+          )}
+
           {error && <div className="error-banner">{error}</div>}
         </div>
         <div className="modal-footer">
@@ -451,9 +489,16 @@ function InstallmentRow({ inst, scheduleId, tasks, userRole, onUpdate, onDelete 
   const canAdmin   = userRole === 'SUPER_ADMIN';
   const canFinance = ['SUPER_ADMIN','FINANCE'].includes(userRole);
   const es         = inst.effectiveStatus;
+  const paidAmount = parseFloat(inst.paidAmount ?? 0);
   const paidPct    = inst.amount > 0
-    ? Math.min(100, Math.round((parseFloat(inst.paidAmount ?? 0) / parseFloat(inst.amount)) * 100))
+    ? Math.min(100, Math.round((paidAmount / parseFloat(inst.amount)) * 100))
     : 0;
+
+  // Admin/finance can log money received from the client at any point in the
+  // lifecycle (before a formal request, after approval, or against an
+  // overdue installment) — the client often pays in parts, so this stays
+  // open for every status except a fully-settled one.
+  const canRecordPayment = canFinance && es !== 'PAID';
 
   const handleRequest = async () => {
     setRequesting(true);
@@ -489,8 +534,8 @@ function InstallmentRow({ inst, scheduleId, tasks, userRole, onUpdate, onDelete 
         </div>
         <div className="inst-col-amount">{inr(inst.amount)}</div>
         <div className="inst-col-paid">
-          {parseFloat(inst.paidAmount ?? 0) > 0
-            ? <span className="paid-amount">{inr(inst.paidAmount)}</span>
+          {paidAmount > 0
+            ? <span className="paid-amount">{inr(paidAmount)}</span>
             : '—'}
         </div>
         <div className="inst-col-due">{fmtDate(inst.dueDate)}</div>
@@ -513,9 +558,9 @@ function InstallmentRow({ inst, scheduleId, tasks, userRole, onUpdate, onDelete 
               Review
             </button>
           )}
-          {canFinance && ['APPROVED','PARTIAL','OVERDUE'].includes(es) && (
+          {canRecordPayment && (
             <button className="action-btn action-btn-pay" onClick={() => setModal('pay')}>
-              Record Pay
+              {paidAmount > 0 ? 'Add Payment' : 'Record Pay'}
             </button>
           )}
           <div style={{ position: 'relative' }}>
@@ -543,7 +588,7 @@ function InstallmentRow({ inst, scheduleId, tasks, userRole, onUpdate, onDelete 
       )}
       {modal === 'pay' && (
         <RecordPaymentModal scheduleId={scheduleId} installment={inst}
-          onSave={() => { setModal(null); onUpdate(null); }} onClose={() => setModal(null)} />
+          onSave={(updated) => { setModal(null); onUpdate(updated); }} onClose={() => setModal(null)} />
       )}
       {modal === 'review' && (
         <ReviewModal scheduleId={scheduleId} installment={inst}
@@ -605,61 +650,70 @@ export default function PaymentScheduleManager({
   const [modal,    setModal]    = useState(null);
   const [error,    setError]    = useState('');
 
- const load = useCallback(async () => {
-  setLoading(true);
-  setError('');
-  try {
-    const data = await paymentAPI.getSchedules(projectId);
-    let s = data?.schedules?.[0] ?? null;
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await paymentAPI.getSchedules(projectId);
+      let s = data?.schedules?.[0] ?? null;
 
-    if (s && s.installments?.length) {
-      // Always derive total from live installments, never trust the stored field
-      const derivedTotal = s.installments.reduce(
-        (sum, i) => sum + parseFloat(i.amount || 0), 0
-      );
-      s = { ...s, totalAmount: derivedTotal };
-    }
+      if (s && s.installments?.length) {
+        // Always derive total from live installments, never trust the stored field
+        const derivedTotal = s.installments.reduce(
+          (sum, i) => sum + parseFloat(i.amount || 0), 0
+        );
+        s = { ...s, totalAmount: derivedTotal };
+      }
 
-    setSchedule(s);
-    if (s) {
-      const sum = await paymentAPI.getSummary(s.id);
-      setSummary(sum);
+      setSchedule(s);
+      if (s) {
+        const sum = await paymentAPI.getSummary(s.id);
+        setSummary(sum);
+      }
+    } catch (e) {
+      setError(e.response?.data?.error || e.message || 'Failed to load payment schedule');
+    } finally {
+      setLoading(false);
     }
-  } catch (e) {
-    setError(e.response?.data?.error || e.message || 'Failed to load payment schedule');
-  } finally {
-    setLoading(false);
-  }
-}, [projectId]);
+  }, [projectId]);
 
   useEffect(() => { load(); }, [load]);
 
   const handleScheduleSave = (s) => { setSchedule(s); setModal(null); load(); };
 
+  // Refresh only the summary bar (collected %, counts, overdue total)
+  // without re-fetching the whole schedule — keeps the optimistic
+  // installment update on screen instantly while the totals catch up.
+  const refreshSummary = useCallback((scheduleId) => {
+    if (!scheduleId) return;
+    paymentAPI.getSummary(scheduleId).then(setSummary).catch(() => {});
+  }, []);
+
   const handleInstUpdate = (updated) => {
     if (!updated) { load(); return; }
-    setSchedule(prev => ({
-      ...prev,
-      installments: prev.installments.map(i => i.id === updated.id ? { ...i, ...updated } : i),
-    }));
-    load();
+    setSchedule(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        installments: prev.installments.map(i => i.id === updated.id ? { ...i, ...updated } : i),
+      };
+    });
+    refreshSummary(schedule?.id);
   };
 
- // Replace handleInstDelete with this:
-const handleInstDelete = (iid) => {
-  setSchedule(prev => {
-    const updatedInstallments = prev.installments.filter(i => i.id !== iid);
-    const newTotal = updatedInstallments.reduce(
-      (sum, i) => sum + parseFloat(i.amount || 0), 0
-    );
-    return { ...prev, installments: updatedInstallments, totalAmount: newTotal };
-  });
-  // Refresh summary counts from server (paid/overdue etc.)
-  // but don't reload schedule — that would reset totalAmount from DB
-  if (schedule?.id) {
-    paymentAPI.getSummary(schedule.id).then(setSummary).catch(() => {});
-  }
-};
+  const handleInstDelete = (iid) => {
+    setSchedule(prev => {
+      if (!prev) return prev;
+      const updatedInstallments = prev.installments.filter(i => i.id !== iid);
+      const newTotal = updatedInstallments.reduce(
+        (sum, i) => sum + parseFloat(i.amount || 0), 0
+      );
+      return { ...prev, installments: updatedInstallments, totalAmount: newTotal };
+    });
+    // Refresh summary counts from server (paid/overdue etc.)
+    // but don't reload schedule — that would reset totalAmount from DB
+    refreshSummary(schedule?.id);
+  };
 
   const canAdmin = userRole === 'SUPER_ADMIN';
 
@@ -789,6 +843,9 @@ const handleInstDelete = (iid) => {
         .pay-meta           { display: flex; justify-content: space-between; align-items: center; background: #f5f5f4; border-radius: 8px; padding: 10px 12px; margin-bottom: 16px; }
         .pay-meta-label     { font-size: 13px; font-weight: 500; color: #1c1917; }
         .pay-meta-remaining { font-size: 13px; color: #1a6b4a; font-weight: 600; }
+        .pay-preview        { font-size: 12px; border-radius: 8px; padding: 8px 12px; margin-top: 4px; }
+        .pay-preview-partial { background: #fef3c7; color: #92400e; }
+        .pay-preview-full    { background: #dcfce7; color: #166534; }
 
         .review-inst-name   { font-size: 13px; font-weight: 500; color: #1c1917; margin-bottom: 14px; background: #f5f5f4; padding: 8px 12px; border-radius: 8px; }
         .review-action-row  { display: flex; gap: 10px; margin-bottom: 14px; }
@@ -804,7 +861,6 @@ const handleInstDelete = (iid) => {
             {schedule && canAdmin && (
               <>
                 <button className="btn-outline" onClick={() => setModal('addInst')}>+ Add installment</button>
-               
               </>
             )}
             {!schedule && canAdmin && (
@@ -855,27 +911,25 @@ const handleInstDelete = (iid) => {
           tasks={tasks} projectId={projectId}
           onSave={handleScheduleSave} onClose={() => setModal(null)} />
       )}
-{modal === 'addInst' && schedule && (
-  <InstallmentModal
-    scheduleId={schedule.id}
-    tasks={tasks}
-    onSave={(inst) => {
-      setSchedule(prev => {
-        const updatedInstallments = [...(prev.installments || []), inst];
-        const newTotal = updatedInstallments.reduce(
-          (sum, i) => sum + parseFloat(i.amount || 0), 0
-        );
-        return { ...prev, installments: updatedInstallments, totalAmount: newTotal };
-      });
-      setModal(null);
-      // Refresh summary counts only, not the full schedule
-      if (schedule?.id) {
-        paymentAPI.getSummary(schedule.id).then(setSummary).catch(() => {});
-      }
-    }}
-    onClose={() => setModal(null)}
-  />
-)}
+      {modal === 'addInst' && schedule && (
+        <InstallmentModal
+          scheduleId={schedule.id}
+          tasks={tasks}
+          onSave={(inst) => {
+            setSchedule(prev => {
+              const updatedInstallments = [...(prev.installments || []), inst];
+              const newTotal = updatedInstallments.reduce(
+                (sum, i) => sum + parseFloat(i.amount || 0), 0
+              );
+              return { ...prev, installments: updatedInstallments, totalAmount: newTotal };
+            });
+            setModal(null);
+            // Refresh summary counts only, not the full schedule
+            refreshSummary(schedule?.id);
+          }}
+          onClose={() => setModal(null)}
+        />
+      )}
     </>
   );
 }

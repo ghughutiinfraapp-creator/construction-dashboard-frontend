@@ -4,9 +4,11 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import Modal from '../../components/ui/Modal';
 import TaskForm from '../../components/tasks/TaskForm';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useAuth } from '../../context/AuthContext'; // ← adjust if your auth hook lives elsewhere
 import { tasksAPI } from '../../lib/api';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
+import SendNotificationModal from '../../components/SendNotificationModal';
 
 const TYPE_META = {
   TASK_ASSIGNED:      { icon: '◻', bg: 'bg-blue-100',   text: 'text-blue-700',   label: 'Task'     },
@@ -88,9 +90,13 @@ export default function NotificationsPage() {
     filtersRef, load, markRead, markAllRead,
   } = useNotifications();
 
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
+
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState(null);
   const [taskIssue, setTaskIssue] = useState(null); // notification currently being turned into a task
+  const [sendOpen, setSendOpen] = useState(false);  // Super Admin: broadcast composer
 
   useEffect(() => { load(1, { unreadOnly }); }, []);
 
@@ -122,11 +128,20 @@ export default function NotificationsPage() {
     <DashboardLayout
       title="Notifications"
       subtitle={`${total} total${unreadCount > 0 ? ` · ${unreadCount} unread` : ''}`}
-      actions={unreadCount > 0 && (
-        <button className="btn-secondary text-xs px-3 py-1.5" onClick={markAllRead}>
-          Mark all read
-        </button>
-      )}
+      actions={
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button className="btn-primary text-xs px-3 py-1.5" onClick={() => setSendOpen(true)}>
+              Send Notification
+            </button>
+          )}
+          {unreadCount > 0 && (
+            <button className="btn-secondary text-xs px-3 py-1.5" onClick={markAllRead}>
+              Mark all read
+            </button>
+          )}
+        </div>
+      }
     >
       <div className="max-w-2xl space-y-4 animate-fade-in">
         {/* Filter */}
@@ -219,6 +234,11 @@ export default function NotificationsPage() {
           />
         )}
       </Modal>
+
+      {/* ── SUPER ADMIN: SEND NOTIFICATION TO CLIENTS ── */}
+      {isSuperAdmin && (
+        <SendNotificationModal open={sendOpen} onClose={() => setSendOpen(false)} />
+      )}
     </DashboardLayout>
   );
 }

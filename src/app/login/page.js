@@ -75,13 +75,9 @@ export default function LoginPage() {
           style={{ backgroundImage: 'repeating-linear-gradient(0deg,#fff 0,#fff 1px,transparent 1px,transparent 40px),repeating-linear-gradient(90deg,#fff 0,#fff 1px,transparent 1px,transparent 40px)' }}/>
         <div className="relative">
           <div className="flex items-center gap-2.5 mb-10">
-            <div className="w-8 h-8 bg-amber-400 rounded-lg flex items-center justify-center">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <rect x="1" y="8" width="6" height="7" rx="1" fill="#1C1917"/>
-                <rect x="9" y="4" width="6" height="11" rx="1" fill="#1C1917"/>
-                <rect x="3" y="1" width="10" height="1.5" rx="0.75" fill="#1C1917"/>
-              </svg>
-            </div>
+             <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <img src="/ghughuti_infra_logo.jpeg" alt="Ghughuti Infra" className="w-full h-full object-cover" />
+          </div>
             <span className="font-display font-light text-white text-lg tracking-tight">Ghughuti Infra</span>
           </div>
           <h2 className="font-display font-light text-white text-4xl leading-tight tracking-tight mb-4">

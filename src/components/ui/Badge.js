@@ -76,6 +76,7 @@ const LABELS = {
   HALF_DAY:         'Half Day',
   PICKED_UP:        'Picked Up',
   SUPER_ADMIN:      'Super Admin',
+  SUPER_ADMIN_VIEW: 'Super Admin View',
   PROJECT_MANAGER:  'Project Manager',
   SITE_ENGINEER:    'Site Engineer',
   DELIVERY_PERSON:  'Delivery Person',

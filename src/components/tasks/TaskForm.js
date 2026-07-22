@@ -37,7 +37,7 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
     isCustom: true,
     subs: [],
   });
-  const [subtasks, setSubtasks] = useState([]); // selected sub-task name strings (create only)
+  const [subtasks, setSubtasks] = useState([]); // selected sub-task name strings
 
   const [projects,    setProjects]    = useState([]);
   const [engineers,   setEngineers]   = useState([]);
@@ -89,7 +89,10 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
       if (!base.dueDate)             delete base.dueDate;
       if (!base.description?.trim()) delete base.description;
 
-      // Attach subtasks if any were selected (create or edit)
+      // Attach subtasks if any were selected (create or edit).
+      // No `id` on these → backend (PUT /api/tasks/:id) creates them as new
+      // child tasks under this task. Existing subtasks are left untouched
+      // since we never include their ids here.
       if (subtasks.length > 0) {
         base.subtasks = subtasks.map(title => ({ title }));
       }
@@ -102,13 +105,16 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
 
   const existingSubtasks = initial?.subtasks ?? [];
 
-  // Create: show for catalog match or custom input
-  // Edit:   show only for catalog match (so user can add more steps)
-  const showSubtaskPicker = form.title.trim() && (
-    isEditing
-      ? !taskSel.isCustom && taskSel.subs.length > 0
-      : taskSel.isCustom || taskSel.subs.length > 0
-  );
+  // Show the "add sub-task" section whenever there's a title — in BOTH
+  // create and edit mode. Previously edit mode was gated behind
+  // `!taskSel.isCustom && taskSel.subs.length > 0`, which meant it only
+  // appeared if the combobox happened to resolve the existing title to a
+  // catalog entry with predefined steps. Since `taskSel` starts as
+  // `{ isCustom: true, subs: [] }` on every edit open (it isn't re-derived
+  // from `initial.title` against the catalog), that condition was almost
+  // never true — so the picker silently never rendered for edits, and
+  // nothing could ever be added to `subtasks`.
+  const showSubtaskPicker = !!form.title.trim();
 
   const submitLabel = isEditing
     ? subtasks.length > 0
@@ -180,17 +186,17 @@ export default function TaskForm({ initial, onSubmit, onCancel }) {
             </div>
             <SubtaskPicker
               subs={taskSel.subs}
-              isCustom={taskSel.isCustom}
+              isCustom={taskSel.isCustom || taskSel.subs.length === 0}
               selected={subtasks}
               onChange={setSubtasks}
             />
-            {!taskSel.isCustom && (
-              <p className="text-[10px] text-stone-400 mt-1.5">
-                {isEditing
-                  ? 'Ticked steps will be added as new sub-tasks.'
-                  : 'Each ticked step becomes a sub-task of this task.'}
-              </p>
-            )}
+            <p className="text-[10px] text-stone-400 mt-1.5">
+              {!taskSel.isCustom && taskSel.subs.length > 0
+                ? (isEditing
+                    ? 'Ticked steps will be added as new sub-tasks.'
+                    : 'Each ticked step becomes a sub-task of this task.')
+                : 'Type a name and add it as a sub-task.'}
+            </p>
           </div>
         </div>
       )}

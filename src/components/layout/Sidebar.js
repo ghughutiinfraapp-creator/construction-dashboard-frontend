@@ -8,33 +8,34 @@ const NAV = [
   {
     group: 'Overview',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: DashIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE','SITE_ENGINEER'] },
-      { href: '/projects', label: 'Projects', icon: ProjectIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','SITE_ENGINEER','CLIENT'] },
+      { href: '/dashboard', label: 'Dashboard', icon: DashIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','FINANCE','SITE_ENGINEER'] },
+      { href: '/projects', label: 'Projects', icon: ProjectIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER','CLIENT'] },
     ]
   },
   {
     group: 'Operations',
     items: [
-      { href: '/tasks', label: 'Tasks', icon: TaskIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','SITE_ENGINEER'] },
-      { href: '/attendance', label: 'Attendance', icon: AttendIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','SITE_ENGINEER'] },
-      { href: '/labour', label: 'Labour', icon: LabourIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','SITE_ENGINEER'] },
+      { href: '/tasks', label: 'Tasks', icon: TaskIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER'] },
+      { href: '/attendance', label: 'Attendance', icon: AttendIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER'] },
+      { href: '/labour', label: 'Sub-Contractor', icon: LabourIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER'] },
       { href: '/site-maps', label: 'Site Maps', icon: SiteMapIcon, roles: ['PROJECT_MANAGER'] },
     ]
   },
   {
     group: 'Procurement',
     items: [
-      { href: '/purchase-orders', label: 'Purchase Orders', icon: POIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE','SITE_ENGINEER'] },
-      { href: '/deliveries', label: 'Deliveries', icon: DeliveryIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE','DELIVERY_PERSON'] },
+      { href: '/purchase-orders', label: 'Purchase Orders', icon: POIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','FINANCE','SITE_ENGINEER'] },
+      { href: '/deliveries', label: 'Deliveries', icon: DeliveryIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','FINANCE','DELIVERY_PERSON'] },
+      { href: '/vendors', label: 'Vendors', icon: VendorIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','FINANCE'] },
     ]
   },
   {
     group: 'Admin',
     items: [
-      { href: '/users', label: 'Users', icon: UsersIcon, roles: ['SUPER_ADMIN'] },
-      { href: '/materials', label: 'Materials', icon: MaterialIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER'] },
-      { href: '/reports', label: 'Reports', icon: ReportIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE'] },
-      { href: '/notifications', label: 'Notifications', icon: BellIcon, roles: ['SUPER_ADMIN','PROJECT_MANAGER','FINANCE','SITE_ENGINEER','DELIVERY_PERSON','CLIENT'] },
+      { href: '/users', label: 'Users', icon: UsersIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW'] },
+      { href: '/materials', label: 'Materials', icon: MaterialIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER'] },
+      { href: '/reports', label: 'Reports', icon: ReportIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','FINANCE'] },
+      { href: '/notifications', label: 'Notifications', icon: BellIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','FINANCE','SITE_ENGINEER','DELIVERY_PERSON','CLIENT'] },
     ]
   },
 ];
@@ -48,12 +49,8 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="px-4 py-5 border-b border-stone-100">
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-stone-800 rounded-lg flex items-center justify-center flex-shrink-0">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-              <rect x="1" y="8" width="6" height="7" rx="1" fill="#FBBF24"/>
-              <rect x="9" y="4" width="6" height="11" rx="1" fill="#FBBF24"/>
-              <rect x="3" y="1" width="10" height="1.5" rx="0.75" fill="#FBBF24"/>
-            </svg>
+          <div className="w-16 h-16 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <img src="/ghughuti_infra_logo.jpeg" alt="Ghughuti Infra" className="w-full h-full object-cover" />
           </div>
           <span className="font-display font-light text-stone-800 text-base tracking-tight">Ghughuti Infra</span>
         </Link>

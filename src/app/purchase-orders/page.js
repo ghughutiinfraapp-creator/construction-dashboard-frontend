@@ -11,8 +11,9 @@ import {
 } from '../../components/purchase-orders/POActionModals';
 import Badge from '../../components/ui/Badge';
 import EmptyState from '../../components/ui/EmptyState';
+import Modal from '../../components/ui/Modal';
 import { usePurchaseOrders } from '../../hooks/usePurchaseOrders';
-import { projectsAPI } from '../../lib/api';
+import { projectsAPI, purchaseOrdersAPI } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -45,16 +46,56 @@ function DotsIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+      <path d="M2.5 4.5h11M6 4.5V3a1 1 0 011-1h2a1 1 0 011 1v1.5M6.5 7.5v4M9.5 7.5v4M3.5 4.5l.6 8.1a1 1 0 001 .9h5.8a1 1 0 001-.9l.6-8.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+// ── Delete confirm ───────────────────────────────────────────────────
+function DeletePOConfirm({ po, onConfirm, onCancel }) {
+  const [busy, setBusy] = useState(false);
+  if (!po) return null;
+  return (
+    <div className="p-5 space-y-4">
+      <p className="text-sm text-stone-600 leading-relaxed">
+        Are you sure you want to delete PO{' '}
+        <strong className="text-stone-800 font-mono">{po.poNumber}</strong>
+        {' '}for <strong className="text-stone-800">{po.project?.name}</strong>?
+        This action cannot be undone and will also remove its delivery record, if any.
+      </p>
+      <div className="flex justify-end gap-2 pt-1">
+        <button className="btn-secondary" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button
+          className="btn-danger"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await onConfirm();
+            setBusy(false);
+          }}
+        >
+          {busy ? 'Deleting…' : 'Delete PO'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Inline row action menu ────────────────────────────────────────────
-function RowActions({ po, userRole, onAction, onView }) {
+function RowActions({ po, userRole, onAction, onView, onDelete }) {
   const [open, setOpen] = useState(false);
 
   const canApprove        = ['FINANCE','SUPER_ADMIN'].includes(userRole) && po.status === 'SUBMITTED';
   const canReject         = ['FINANCE','SUPER_ADMIN'].includes(userRole) && po.status === 'SUBMITTED';
   const canAssignVendor   = ['FINANCE','SUPER_ADMIN'].includes(userRole) && po.status === 'APPROVED';
   const canAssignDelivery = ['FINANCE','PROJECT_MANAGER','SUPER_ADMIN'].includes(userRole) && po.status === 'VENDOR_ASSIGNED';
+  // Delete — SUPER_ADMIN only, any status
+  const canDelete         = userRole === 'SUPER_ADMIN';
 
-  const hasActions = canApprove || canReject || canAssignVendor || canAssignDelivery;
+  const hasActions = canApprove || canReject || canAssignVendor || canAssignDelivery || canDelete;
 
   return (
     <div className="relative flex items-center gap-1 justify-end">
@@ -112,6 +153,19 @@ function RowActions({ po, userRole, onAction, onView }) {
                     Assign Delivery
                   </button>
                 )}
+                {canDelete && (
+                  <>
+                    {(canApprove || canReject || canAssignVendor || canAssignDelivery) && (
+                      <div className="border-t border-stone-100" />
+                    )}
+                    <button
+                      onClick={() => { onDelete(po); setOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50 flex items-center gap-2">
+                      <TrashIcon />
+                      Delete PO
+                    </button>
+                  </>
+                )}
               </div>
             </>
           )}
@@ -122,7 +176,7 @@ function RowActions({ po, userRole, onAction, onView }) {
 }
 
 // ── Table row ─────────────────────────────────────────────────────────
-function PORow({ po, userRole, onAction, onView }) {
+function PORow({ po, userRole, onAction, onView, onDelete }) {
   const itemCount = po.items?.length ?? po._count?.items ?? 0;
 
   return (
@@ -199,6 +253,7 @@ function PORow({ po, userRole, onAction, onView }) {
           userRole={userRole}
           onAction={onAction}
           onView={onView}
+          onDelete={onDelete}
         />
       </td>
     </tr>
@@ -224,6 +279,7 @@ export default function PurchaseOrdersPage() {
   const [rejectPO,   setRejectPO]   = useState(null);
   const [vendorPO,   setVendorPO]   = useState(null);
   const [deliveryPO, setDeliveryPO] = useState(null);
+  const [deletePO,   setDeletePO]   = useState(null); // PO pending delete confirmation
 
   const canCreate = user && ['SITE_ENGINEER','PROJECT_MANAGER','SUPER_ADMIN'].includes(user.role);
 
@@ -275,6 +331,24 @@ export default function PurchaseOrdersPage() {
   const handleCreate = async (payload) => {
     try { await create(payload); }
     catch (err) { throw err; }
+  };
+
+  // Delete — SUPER_ADMIN only. Called directly via purchaseOrdersAPI since
+  // the usePurchaseOrders hook doesn't expose a delete method; we just
+  // re-run `load(page)` afterward to refresh the table from the hook's
+  // existing state management.
+  const handleDeletePO = async () => {
+    if (!deletePO) return;
+    try {
+      await purchaseOrdersAPI.delete(deletePO.id);
+      toast.success(`PO ${deletePO.poNumber} deleted`);
+      if (drawerPoId === deletePO.id) setDrawerPoId(null);
+      await load(page);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to delete purchase order');
+    } finally {
+      setDeletePO(null);
+    }
   };
 
   const pendingCount = orders.filter(o =>
@@ -395,6 +469,7 @@ export default function PurchaseOrdersPage() {
                         userRole={user?.role}
                         onAction={handleAction}
                         onView={() => setDrawerPoId(po.id)}
+                        onDelete={setDeletePO}
                       />
                     ))}
                   </tbody>
@@ -488,13 +563,13 @@ export default function PurchaseOrdersPage() {
 
       </div>
 
-      {/* Modals & drawer — unchanged */}
+      {/* Modals & drawer */}
       <POCreateModal
         open={createOpen}
         onSubmit={handleCreate}
         onClose={() => setCreateOpen(false)}
       />
-      <PODetailDrawer poId={drawerPoId} onClose={() => setDrawerPoId(null)} />
+      <PODetailDrawer poId={drawerPoId} onClose={() => setDrawerPoId(null)} onDelete={setDeletePO} />
       <RejectModal
         po={rejectPO}
         onConfirm={handleReject}
@@ -510,6 +585,15 @@ export default function PurchaseOrdersPage() {
         onConfirm={handleAssignDelivery}
         onClose={() => setDeliveryPO(null)}
       />
+
+      {/* Delete confirm modal — SUPER_ADMIN only */}
+      <Modal open={!!deletePO} onClose={() => setDeletePO(null)} title="Delete Purchase Order" width="max-w-sm">
+        <DeletePOConfirm
+          po={deletePO}
+          onConfirm={handleDeletePO}
+          onCancel={() => setDeletePO(null)}
+        />
+      </Modal>
     </DashboardLayout>
   );
 }

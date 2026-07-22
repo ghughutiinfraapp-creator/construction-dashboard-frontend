@@ -9,6 +9,8 @@ const ROLES = [
   { value: 'DELIVERY_PERSON', label: 'Delivery Person' },
   { value: 'CLIENT',          label: 'Client'          },
   { value: 'SUPER_ADMIN',     label: 'Super Admin'     },
+  { value: 'SUPER_ADMIN_VIEW',     label: 'Super Admin View'     },
+  { value: 'JUNIOR_ENGINEER ',     label: 'Junior Engineer '     },
 ];
 
 function Err({ msg }) {
@@ -78,7 +80,7 @@ export default function UserForm({ initial, onSubmit, onCancel, isSuperAdmin }) 
       <div>
         <label className="label">Role *</label>
         <select className="input select" value={form.role} onChange={e => set('role', e.target.value)}>
-          {ROLES.filter(r => isSuperAdmin || r.value !== 'SUPER_ADMIN').map(r => (
+          {ROLES.filter(r => isSuperAdmin || (r.value !== 'SUPER_ADMIN' && r.value !== 'SUPER_ADMIN_VIEW')).map(r => (
             <option key={r.value} value={r.value}>{r.label}</option>
           ))}
         </select>

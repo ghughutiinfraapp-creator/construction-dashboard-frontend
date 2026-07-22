@@ -4,6 +4,7 @@ import { purchaseOrdersAPI } from '../../lib/api';
 import Badge from '../ui/Badge';
 import { format } from 'date-fns';
 import { PrintPOButton } from './Printablepo';
+import { useAuth } from '../../context/AuthContext';
 
 function fmt(n) {
   if (!n) return '—';
@@ -24,6 +25,14 @@ function Row({ label, value }) {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+      <path d="M2.5 4.5h11M6 4.5V3a1 1 0 011-1h2a1 1 0 011 1v1.5M6.5 7.5v4M9.5 7.5v4M3.5 4.5l.6 8.1a1 1 0 001 .9h5.8a1 1 0 001-.9l.6-8.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 // Optional: fill in your org's letterhead details for the printed PDF.
 // You could also load this from context/config instead of hardcoding it here.
 const COMPANY_INFO = {
@@ -34,7 +43,15 @@ const COMPANY_INFO = {
   email: '',
 };
 
-export default function PODetailDrawer({ poId, onClose }) {
+// `onDelete` — optional callback, called with the full `po` object when the
+// SUPER_ADMIN clicks Delete here. Pass a handler from the parent page that
+// opens the shared delete-confirm modal (e.g. `onDelete={setDeletePO}`),
+// so there's a single confirm flow shared between the list view and this
+// drawer, rather than duplicating the confirm UI in both places.
+export default function PODetailDrawer({ poId, onClose, onDelete }) {
+  const { user } = useAuth();
+  const canDelete = user?.role === 'SUPER_ADMIN';
+
   const [po,      setPo]      = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -66,7 +83,7 @@ export default function PODetailDrawer({ poId, onClose }) {
             </h2>
             {!loading && po && <Badge status={po.status} dot className="mt-1" />}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {!loading && po && (
               <div className='flex cursor-pointer border-2 rounded-lg w-20 px-2'>
               <p className='font-bold text-md'>Print</p>
@@ -74,6 +91,19 @@ export default function PODetailDrawer({ poId, onClose }) {
               </div>
               
             )}
+
+            {/* Delete — SUPER_ADMIN only */}
+            {!loading && po && canDelete && onDelete && (
+              <button
+                onClick={() => onDelete(po)}
+                title="Delete purchase order"
+                className="w-9 h-9 flex items-center justify-center rounded-lg
+                           hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
+              >
+                <TrashIcon />
+              </button>
+            )}
+
             <button onClick={onClose}
               className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-stone-100 text-stone-400">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

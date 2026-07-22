@@ -41,7 +41,7 @@ function fmt(n) {
  */
 export default function ProjectCard({ project, paymentSummary, userRole }) {
   const { user } = useAuth();
-const canSeeBudget = user && ['SUPER_ADMIN', 'FINANCE'].includes(user.role);
+const canSeeBudget = user && ['SUPER_ADMIN', 'SUPER_ADMIN_VIEW', 'FINANCE'].includes(user.role);
   const { id, name, address, status, budget, startDate, endDate, manager, client, _count } = project;
   const totalTasks = _count?.tasks || 0;
   const tasksDone  = 0;

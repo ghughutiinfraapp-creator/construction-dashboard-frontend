@@ -112,6 +112,7 @@ export const taskCategoriesAPI = {
 export const labourAPI = {
   getLabourers: (params) => api.get('/labour/labourers', { params }),
   createLabourer: (data) => api.post('/labour/labourers', data),
+  updateLabourer: (id, data) => api.put(`/labour/labourers/${id}`, data), // NEW
   getAttendance: (params) => api.get('/labour/attendance', { params }),
   markAttendance: (data) => api.post('/labour/attendance/mark', data),
   getWageReport: (params) => api.get('/labour/wage-report', { params }),
@@ -127,6 +128,7 @@ export const purchaseOrdersAPI = {
   assignVendor: (id, data) => api.put(`/purchase-orders/${id}/assign-vendor`, data),
   assignDelivery: (id, deliveryPersonId) =>
     api.put(`/purchase-orders/${id}/assign-delivery`, { deliveryPersonId }),
+  delete: (id) => api.delete(`/purchase-orders/${id}`),
 };
 
 // ─── DELIVERIES ──────────────────────────────────────────────────────
@@ -145,6 +147,8 @@ export const vendorsAPI = {
   getById: (id) => api.get(`/vendors/${id}`),
   create: (data) => api.post('/vendors', data),
   update: (id, data) => api.put(`/vendors/${id}`, data),
+  getPayments: (id) => api.get(`/vendors/${id}/payments`),
+  addPayment: (id, data) => api.post(`/vendors/${id}/payments`, data),
 };
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────
@@ -152,15 +156,18 @@ export const notificationsAPI = {
   getAll: (params) => api.get('/notifications', { params }),
   markRead: (id) => api.put(`/notifications/${id}/read`),
   markAllRead: () => api.put('/notifications/read-all'),
+   broadcast: (payload) => api.post('/notifications/broadcast-to-clients', payload),
 };
 
 // ─── PHOTOS ────────────────────────────────────────────────────────────
-// Thin wrapper around GET /api/photos and GET /api/photos/:id.
-// Used by the Site Maps page (filters via entityType: 'SITE_MAP') and can
-// be reused anywhere else photos need to be listed (galleries, task photos).
+// Thin wrapper around GET /api/photos, GET /api/photos/:id, and
+// DELETE /api/photos/:id. Used by the Site Maps page (filters via
+// entityType: 'SITE_MAP') and can be reused anywhere else photos need to
+// be listed or removed (galleries, task photos).
 export const photosAPI = {
   getAll: (params) => api.get('/photos', { params }),
   getById: (id) => api.get(`/photos/${id}`),
+  delete: (id) => api.delete(`/photos/${id}`),
 };
 
 // ─── UPLOADS ─────────────────────────────────────────────────────────

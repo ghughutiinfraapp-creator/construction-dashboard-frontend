@@ -4,7 +4,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from '../../components/ui/StatCard';
 import POPipeline from '../../components/dashboard/POPipeline';
 import RecentActivity from '../../components/dashboard/RecentActivity';
-import { dashboardAPI } from '../../lib/api';
+import { dashboardAPI, labourAPI } from '../../lib/api';
 import { useTasks } from '../../hooks/useTasks';
 import { useAuth } from '../../context/AuthContext';
 
@@ -229,13 +229,14 @@ function PriorityBreakdown({ tasks }) {
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { user } = useAuth();
-  const canSeeBudget = user && ['SUPER_ADMIN', 'FINANCE'].includes(user.role);
+  const canSeeBudget = user && ['SUPER_ADMIN', 'SUPER_ADMIN_VIEW', 'FINANCE'].includes(user.role);
 
   // Dashboard-level data
-  const [stats,    setStats]    = useState(null);
-  const [pipeline, setPipeline] = useState(null);
-  const [activity, setActivity] = useState(null);
-  const [loading,  setLoading]  = useState(true);
+  const [stats,          setStats]          = useState(null);
+  const [pipeline,        setPipeline]        = useState(null);
+  const [activity,        setActivity]        = useState(null);
+  const [totalLabourCost, setTotalLabourCost] = useState(0);
+  const [loading,         setLoading]         = useState(true);
 
   // Reuse the same useTasks hook your tasks page uses — fetch all, no pagination
   const { tasks, loading: tasksLoading, load: loadTasks } = useTasks();
@@ -249,14 +250,23 @@ export default function DashboardPage() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [s, p, a] = await Promise.all([
+      const [s, p, a, l] = await Promise.all([
         dashboardAPI.getStats(),
         dashboardAPI.getPOPipeline(),
         dashboardAPI.getRecentActivity(),
+        // No projectId filter → every active labourer across every project.
+        // Only fetched for roles that can see the Budget Spent card.
+        canSeeBudget ? labourAPI.getLabourers({}) : Promise.resolve({ data: { labourers: [] } }),
       ]);
       setStats(s.data);
       setPipeline(p.data.pipeline);
       setActivity(a.data);
+
+      // Sum amountPaid across every labourer, every project — this is the
+      // "actual cost spent on labour" figure (same value each project's
+      // detail page derives its own per-project labourCost from).
+      const labourers = l.data.labourers || [];
+      setTotalLabourCost(labourers.reduce((sum, lab) => sum + Number(lab.amountPaid || 0), 0));
     } catch {}
     setLoading(false);
   };
@@ -268,6 +278,11 @@ export default function DashboardPage() {
   const overdueCount = tasks.filter(t =>
     t.dueDate && new Date(t.dueDate) < new Date() && !['COMPLETED', 'VERIFIED'].includes(t.status)
   ).length;
+
+  // Budget Spent = PO spend (closed POs, from dashboard stats) + labour cost
+  // (sum of amountPaid across all labourers, all projects).
+  const totalPOSpend    = Number(stats?.totalSpend || 0);
+  const totalBudgetSpent = totalPOSpend + totalLabourCost;
 
   return (
     <DashboardLayout>
@@ -298,8 +313,15 @@ export default function DashboardPage() {
               <StatCard label="Today Present"   value={stats?.todayAttendance ?? '—'} sub={`of ${stats?.totalEngineers ?? '—'} engineers`}  icon={<HardhatIcon />}  color="green"  loading={loading} />
               <StatCard label="Pending POs"     value={stats?.pendingPOs ?? '—'}       sub="awaiting action"                                  icon={<POIcon />}       color="amber"  loading={loading} />
               {canSeeBudget && (
-  <StatCard label="Budget Spent" value={stats ? fmt(Number(stats.totalSpend)) : '—'} sub="closed POs" icon={<MoneyIcon />} color="stone" loading={loading} />
-)}
+                <StatCard
+                  label="Budget Spent"
+                  value={stats ? fmt(totalBudgetSpent) : '—'}
+                  sub="PO + labour, all projects"
+                  icon={<MoneyIcon />}
+                  color="stone"
+                  loading={loading}
+                />
+              )}
             </div>
           )}
         </Section>

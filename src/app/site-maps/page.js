@@ -1,8 +1,10 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
+import Modal from '../../components/ui/Modal';
 import { projectsAPI, photosAPI, uploadsAPI } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
+import toast from 'react-hot-toast';
 
 // ── Icons ──────────────────────────────────────────────────────────────────
 function SiteMapIcon({ size = 18, className = '' }) {
@@ -22,6 +24,11 @@ function CloseIcon({ size = 18 }) {
     <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
   </svg>;
 }
+function TrashIcon({ size = 15 }) {
+  return <svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+    <path d="M2.5 4.5h11M6 4.5V3a1 1 0 011-1h2a1 1 0 011 1v1.5M6.5 7.5v4M9.5 7.5v4M3.5 4.5l.6 8.1a1 1 0 001 .9h5.8a1 1 0 001-.9l.6-8.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>;
+}
 
 function Skeleton({ className = '' }) {
   return <div className={`animate-pulse bg-stone-100 rounded-lg ${className}`} />;
@@ -32,8 +39,38 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// ── Delete confirm ───────────────────────────────────────────────────────
+function DeletePhotoConfirm({ photo, onConfirm, onCancel }) {
+  const [busy, setBusy] = useState(false);
+  if (!photo) return null;
+  return (
+    <div className="p-5 space-y-4">
+      <p className="text-sm text-stone-600 leading-relaxed">
+        Are you sure you want to delete{' '}
+        <strong className="text-stone-800">"{photo.caption || 'this map'}"</strong>?
+        This will remove it permanently, including the file in storage.
+      </p>
+      <div className="flex justify-end gap-2 pt-1">
+        <button className="btn-secondary" onClick={onCancel} disabled={busy}>Cancel</button>
+        <button
+          className="btn-danger"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await onConfirm();
+            setBusy(false);
+          }}
+        >
+          {busy ? 'Deleting…' : 'Delete Map'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function SiteMapsPage() {
   const { user } = useAuth();
+  const canDelete = user && ['SUPER_ADMIN', 'PROJECT_MANAGER'].includes(user.role);
 
   const [projects, setProjects]       = useState([]);
   const [projectsLoading, setPLoad]   = useState(true);
@@ -47,6 +84,10 @@ export default function SiteMapsPage() {
   const [uploadError, setUploadError] = useState('');
   const [dragActive, setDragActive]   = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
+
+  // Photo pending delete confirmation
+  const [deletePhoto, setDeletePhoto] = useState(null);
 
   const fileInputRef = useRef(null);
 
@@ -130,6 +171,36 @@ export default function SiteMapsPage() {
     e.preventDefault();
     setDragActive(false);
     handleFiles(e.dataTransfer.files);
+  };
+
+  // ── Delete handling ─────────────────────────────────────────────────────
+  const openLightbox = (photo) => {
+    if (photo.url.toLowerCase().includes('.pdf')) {
+      window.open(photo.url, '_blank');
+    } else {
+      setLightboxUrl(photo.url);
+      setLightboxPhoto(photo);
+    }
+  };
+
+  const closeLightbox = () => {
+    setLightboxUrl(null);
+    setLightboxPhoto(null);
+  };
+
+  const handleDeletePhoto = async () => {
+    if (!deletePhoto) return;
+    try {
+      await photosAPI.delete(deletePhoto.id);
+      toast.success('Map deleted');
+      setMaps(prev => prev.filter(p => p.id !== deletePhoto.id));
+      // If the deleted photo was open in the lightbox, close it too
+      if (lightboxPhoto?.id === deletePhoto.id) closeLightbox();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete map');
+    } finally {
+      setDeletePhoto(null);
+    }
   };
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
@@ -241,43 +312,52 @@ export default function SiteMapsPage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {maps.map(photo => (
-                  <button
-                    key={photo.id}
-                    onClick={() => {
-  if (photo.url.toLowerCase().includes(".pdf")) {
-    window.open(photo.url, "_blank");
-  } else {
-    setLightboxUrl(photo.url);
-  }
-}}
-                    className="card p-0 overflow-hidden text-left group"
-                  >
-                    <div className="aspect-[4/3] bg-stone-100 overflow-hidden flex items-center justify-center">
-  {photo.url.toLowerCase().includes(".pdf") ? (
-    <div className="flex flex-col items-center justify-center h-full w-full bg-red-50">
-      <div className="text-5xl">📄</div>
-      <span className="text-sm font-medium text-red-700 mt-2">
-        PDF Document
-      </span>
-    </div>
-  ) : (
-    <img
-      src={photo.url}
-      alt={photo.caption || "Site map"}
-      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-    />
-  )}
-</div>
-                    <div className="p-2.5">
-                      <p className="text-xs font-medium text-stone-700 truncate">
-                        {photo.caption || 'Untitled map'}
-                      </p>
-                      <p className="text-[10px] text-stone-400 mt-0.5">
-                        {formatDate(photo.capturedAt || photo.createdAt)}
-                        {photo.uploadedBy?.name ? ` · ${photo.uploadedBy.name}` : ''}
-                      </p>
-                    </div>
-                  </button>
+                  <div key={photo.id} className="card p-0 overflow-hidden text-left group relative">
+                    {/* Delete button — SUPER_ADMIN / PROJECT_MANAGER only */}
+                    {canDelete && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeletePhoto(photo);
+                        }}
+                        title="Delete map"
+                        className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      >
+                        <TrashIcon size={13} />
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => openLightbox(photo)}
+                      className="block w-full text-left"
+                    >
+                      <div className="aspect-[4/3] bg-stone-100 overflow-hidden flex items-center justify-center">
+                        {photo.url.toLowerCase().includes(".pdf") ? (
+                          <div className="flex flex-col items-center justify-center h-full w-full bg-red-50">
+                            <div className="text-5xl">📄</div>
+                            <span className="text-sm font-medium text-red-700 mt-2">
+                              PDF Document
+                            </span>
+                          </div>
+                        ) : (
+                          <img
+                            src={photo.url}
+                            alt={photo.caption || "Site map"}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          />
+                        )}
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-xs font-medium text-stone-700 truncate">
+                          {photo.caption || 'Untitled map'}
+                        </p>
+                        <p className="text-[10px] text-stone-400 mt-0.5">
+                          {formatDate(photo.capturedAt || photo.createdAt)}
+                          {photo.uploadedBy?.name ? ` · ${photo.uploadedBy.name}` : ''}
+                        </p>
+                      </div>
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -289,14 +369,28 @@ export default function SiteMapsPage() {
       {lightboxUrl && (
         <div
           className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-6"
-          onClick={() => setLightboxUrl(null)}
+          onClick={closeLightbox}
         >
           <button
             className="absolute top-5 right-5 text-white/80 hover:text-white"
-            onClick={() => setLightboxUrl(null)}
+            onClick={closeLightbox}
           >
             <CloseIcon size={22} />
           </button>
+
+          {/* Delete button inside lightbox — SUPER_ADMIN / PROJECT_MANAGER only */}
+          {canDelete && lightboxPhoto && (
+            <button
+              className="absolute top-5 right-16 flex items-center gap-1.5 text-white/80 hover:text-red-400 text-xs font-medium"
+              onClick={(e) => {
+                e.stopPropagation();
+                setDeletePhoto(lightboxPhoto);
+              }}
+            >
+              <TrashIcon size={15} /> Delete
+            </button>
+          )}
+
           <img
             src={lightboxUrl}
             alt="Site map"
@@ -305,6 +399,15 @@ export default function SiteMapsPage() {
           />
         </div>
       )}
+
+      {/* Delete confirm modal */}
+      <Modal open={!!deletePhoto} onClose={() => setDeletePhoto(null)} title="Delete Site Map" width="max-w-sm">
+        <DeletePhotoConfirm
+          photo={deletePhoto}
+          onConfirm={handleDeletePhoto}
+          onCancel={() => setDeletePhoto(null)}
+        />
+      </Modal>
     </DashboardLayout>
   );
 }

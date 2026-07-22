@@ -36,5 +36,16 @@ export function useVendors() {
     return data.vendor;
   };
 
-  return { vendors, loading, filtersRef, load, create, update };
+  const getVendor = async (id) => {
+    const { data } = await vendorsAPI.getById(id);
+    return data.vendor;
+  };
+
+  const addPayment = async (id, payload) => {
+    const { data } = await vendorsAPI.addPayment(id, payload);
+    toast.success('Payment recorded');
+    return data.payment;
+  };
+
+  return { vendors, loading, filtersRef, load, create, update, getVendor, addPayment };
 }

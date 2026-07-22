@@ -34,7 +34,7 @@ export default function LabourPage() {
     labourers, wageReport, totalWageCost,
     loading, wageLoading,
     labFiltersRef,
-    loadLabourers, addLabourer,
+    loadLabourers, addLabourer, updateLabourer,
     markAttendance, loadWageReport,
   } = useLabour();
 
@@ -56,6 +56,11 @@ export default function LabourPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [attendOpen, setAttendOpen] = useState(false);
   const [attendProject, setAttendProject] = useState('');
+
+  // Inline edit state for Contract Amount / Amount Paid
+  const [editingId, setEditingId] = useState(null);
+  const [editValues, setEditValues] = useState({ proposedAmount: '', amountPaid: '' });
+  const [saving, setSaving] = useState(false);
 
   const canManage = user && ['SITE_ENGINEER', 'PROJECT_MANAGER', 'SUPER_ADMIN'].includes(user.role);
 
@@ -110,6 +115,44 @@ export default function LabourPage() {
     loadWageReport(wageFilters);
   };
 
+  // ── Inline edit: Contract Amount / Amount Paid ──────────────────────
+  const startEdit = (l) => {
+    setEditingId(l.id);
+    setEditValues({
+      proposedAmount: String(l.proposedAmount ?? ''),
+      amountPaid: String(l.amountPaid ?? ''),
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditValues({ proposedAmount: '', amountPaid: '' });
+  };
+
+  const saveEdit = async (id) => {
+    const proposedAmount = parseFloat(editValues.proposedAmount);
+    const amountPaid = parseFloat(editValues.amountPaid);
+
+    if (isNaN(proposedAmount) || proposedAmount <= 0) {
+      toast.error('Enter a valid contract amount');
+      return;
+    }
+    if (isNaN(amountPaid) || amountPaid < 0) {
+      toast.error('Enter a valid amount paid');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateLabourer(id, { proposedAmount, amountPaid });
+      cancelEdit();
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to update amounts');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Labourers for the selected attendance project
   const projectLabourers = attendProject
     ? labourers.filter(l => l.project?.id === attendProject || l.projectId === attendProject)
@@ -161,7 +204,21 @@ export default function LabourPage() {
         {/* ══ LABOURERS TAB ══ */}
         {tab === 'labourers' && (
           <>
-            
+            {/* Payroll summary strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+              <div className="card px-4 py-3">
+                <p className="text-[10px] text-stone-400 uppercase tracking-wide mb-1">Total Contract Amount</p>
+                <p className="text-xl font-semibold text-stone-800 font-display">
+                  ₹{totalDailyPayroll.toLocaleString()}
+                </p>
+              </div>
+              <div className="card px-4 py-3">
+                <p className="text-[10px] text-stone-400 uppercase tracking-wide mb-1">Total Amount Paid</p>
+                <p className="text-xl font-semibold text-green-700 font-display">
+                  ₹{totalAmountPaid.toLocaleString()}
+                </p>
+              </div>
+            </div>
 
             {/* Filters */}
             <div className="flex flex-wrap gap-2 items-center">
@@ -235,16 +292,19 @@ export default function LabourPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-stone-100 bg-stone-25">
-                        {['Name', 'Trade', 'Project', 'Daily Wage', 'Phone', 'Aadhaar'].map(h => (
-                          <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
-                                                 text-stone-400 uppercase tracking-wide whitespace-nowrap">
-                            {h}
-                          </th>
-                        ))}
+                        {['Name', 'Trade', 'Project', 'Contract Amount', 'Amount Paid', 'Phone', 'Aadhaar', canManage ? 'Actions' : null]
+                          .filter(Boolean)
+                          .map(h => (
+                            <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
+                                                   text-stone-400 uppercase tracking-wide whitespace-nowrap">
+                              {h}
+                            </th>
+                          ))}
                       </tr>
                     </thead>
                     <tbody>
                       {labourers.map(l => {
+                        const isEditing = editingId === l.id;
                         const dailyWage = Number(l.proposedAmount || 0);
                         const paid = Number(l.amountPaid || 0);
                         return (
@@ -268,14 +328,33 @@ export default function LabourPage() {
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <span className="text-xs font-mono font-medium text-stone-700">
-                                ₹{dailyWage.toLocaleString()}
-                              </span>
+                              {isEditing ? (
+                                <input
+                                  type="number" min="0" step="0.01"
+                                  className="input text-xs w-24 py-1"
+                                  value={editValues.proposedAmount}
+                                  onChange={e => setEditValues(p => ({ ...p, proposedAmount: e.target.value }))}
+                                  autoFocus
+                                />
+                              ) : (
+                                <span className="text-xs font-mono font-medium text-stone-700">
+                                  ₹{dailyWage.toLocaleString()}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3">
-                              <span className="text-xs font-mono font-medium text-green-700">
-                                ₹{paid.toLocaleString()}
-                              </span>
+                              {isEditing ? (
+                                <input
+                                  type="number" min="0" step="0.01"
+                                  className="input text-xs w-24 py-1"
+                                  value={editValues.amountPaid}
+                                  onChange={e => setEditValues(p => ({ ...p, amountPaid: e.target.value }))}
+                                />
+                              ) : (
+                                <span className="text-xs font-mono font-medium text-green-700">
+                                  ₹{paid.toLocaleString()}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               <span className="text-xs text-stone-500 font-mono">
@@ -287,6 +366,32 @@ export default function LabourPage() {
                                 {l.aadhaar || '—'}
                               </span>
                             </td>
+                            {canManage && (
+                              <td className="px-4 py-3">
+                                {isEditing ? (
+                                  <div className="flex gap-2">
+                                    <button
+                                      className="text-xs font-medium text-green-600 hover:underline disabled:opacity-50"
+                                      disabled={saving}
+                                      onClick={() => saveEdit(l.id)}>
+                                      {saving ? 'Saving…' : 'Save'}
+                                    </button>
+                                    <button
+                                      className="text-xs text-stone-400 hover:underline"
+                                      disabled={saving}
+                                      onClick={cancelEdit}>
+                                      Cancel
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    className="text-xs text-stone-500 hover:text-stone-700 hover:underline"
+                                    onClick={() => startEdit(l)}>
+                                    Edit
+                                  </button>
+                                )}
+                              </td>
+                            )}
                           </tr>
                         );
                       })}

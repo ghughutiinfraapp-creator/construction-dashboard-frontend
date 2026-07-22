@@ -73,11 +73,18 @@ export function useLabour() {
     }
   }, []);
 
-  return {
+  const updateLabourer = async (id, payload) => {
+    const { data } = await labourAPI.updateLabourer(id, payload);
+    setLabourers(prev => prev.map(l => (l.id === id ? data.labourer : l)));
+    toast.success('Amounts updated');
+    return data.labourer;
+  };
+
+ return {
     labourers, attendance, wageReport, totalWageCost,
     loading, attLoading, wageLoading,
     labFiltersRef,
-    loadLabourers, addLabourer,
+    loadLabourers, addLabourer, updateLabourer, 
     loadAttendance, markAttendance,
     loadWageReport,
   };

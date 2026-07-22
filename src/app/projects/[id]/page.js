@@ -59,8 +59,8 @@ export default function ProjectDetailPage() {
   const [savingGeo, setSavingGeo] = useState(false);
 
   const canEdit = user && ['SUPER_ADMIN','PROJECT_MANAGER'].includes(user.role);
-  const canManagePayments = user && ['SUPER_ADMIN','FINANCE'].includes(user.role);
-  const canSeeBudget = user && ['SUPER_ADMIN','FINANCE'].includes(user.role);
+  const canManagePayments = user && ['SUPER_ADMIN', 'SUPER_ADMIN_VIEW', 'FINANCE'].includes(user.role);
+  const canSeeBudget = user && ['SUPER_ADMIN', 'SUPER_ADMIN_VIEW', 'FINANCE'].includes(user.role);
 
   useEffect(() => { load(); }, [id]);
 
@@ -163,14 +163,12 @@ export default function ProjectDetailPage() {
     ? [
         { label: 'Estimated Budget',            value: fmt(project.budget)   },
         { label: 'PO Spend',          value: fmt(summary?.totalPOSpend) },
-        // { label: 'Labour Cost',       value: fmt(labourCost)       },
-        { label: "Cost Spent on Labour",    value: fmt(todayLabourCost)  },
+        { label: "Cost Spent on Labour",    value: fmt(labourCost)  }, // now lifetime, not just today
         { label: 'Task Progress',     value: `${taskPct}%`         },
       ]
     : [
         { label: 'Purchase Orders',   value: poCount                },
-        // { label: 'Labour Cost',       value: fmt(labourCost)        },
-        { label:  "Cost Spent on Labour",value: fmt(todayLabourCost)   },
+        { label:  "Cost Spent on Labour",value: fmt(labourCost)   }, // now lifetime, not just today
         { label: 'Task Progress',     value: `${taskPct}%`          },
       ];
 
