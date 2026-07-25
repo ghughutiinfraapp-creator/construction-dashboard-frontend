@@ -45,13 +45,13 @@ const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 const STATUS_CONFIG = {
-  PENDING:   { label: 'Pending',   cls: 'badge-neutral' },
-  OVERDUE:   { label: 'Overdue',   cls: 'badge-danger'  },
+  PENDING: { label: 'Pending', cls: 'badge-neutral' },
+  OVERDUE: { label: 'Overdue', cls: 'badge-danger' },
   REQUESTED: { label: 'Requested', cls: 'badge-warning' },
-  APPROVED:  { label: 'Approved',  cls: 'badge-success' },
-  REJECTED:  { label: 'Rejected',  cls: 'badge-danger'  },
-  PARTIAL:   { label: 'Partial',   cls: 'badge-info'    },
-  PAID:      { label: 'Paid',      cls: 'badge-paid'    },
+  APPROVED: { label: 'Approved', cls: 'badge-success' },
+  REJECTED: { label: 'Rejected', cls: 'badge-danger' },
+  PARTIAL: { label: 'Partial', cls: 'badge-info' },
+  PAID: { label: 'Paid', cls: 'badge-paid' },
 };
 
 function StatusBadge({ status }) {
@@ -67,7 +67,6 @@ function ProgressBar({ value, total, color = '#1a6b4a' }) {
     </div>
   );
 }
-
 // ─── Create / Edit Schedule Modal ─────────────────────────────────────────────
 
 function ScheduleModal({ existing, tasks, projectId, onSave, onClose }) {
@@ -89,8 +88,8 @@ function ScheduleModal({ existing, tasks, projectId, onSave, onClose }) {
   const updateRow = (i, field, val) =>
     setInstallments(p => p.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)));
 
-  const instSum  = installments.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
-  const total    = parseFloat(totalAmount || 0);
+  const instSum = installments.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+  const total = parseFloat(totalAmount || 0);
   const balanced = total > 0 && Math.abs(instSum - total) <= 0.5;
 
   const handleSave = async () => {
@@ -110,11 +109,11 @@ function ScheduleModal({ existing, tasks, projectId, onSave, onClose }) {
           totalAmount: parseFloat(totalAmount),
           notes,
           installments: installments.map((r, i) => ({
-            title:   r.title   || `Installment ${i + 1}`,
-            amount:  parseFloat(r.amount),
+            title: r.title || `Installment ${i + 1}`,
+            amount: parseFloat(r.amount),
             dueDate: r.dueDate || null,
-            taskId:  r.taskId  || null,
-            notes:   r.notes   || null,
+            taskId: r.taskId || null,
+            notes: r.notes || null,
           })),
         });
       }
@@ -230,20 +229,20 @@ function ScheduleModal({ existing, tasks, projectId, onSave, onClose }) {
 function InstallmentModal({ scheduleId, existing, tasks, onSave, onClose }) {
   const isEdit = !!existing;
   const [form, setForm] = useState({
-    title:   existing?.title  ?? '',
-    amount:  existing?.amount ?? '',
+    title: existing?.title ?? '',
+    amount: existing?.amount ?? '',
     dueDate: existing?.dueDate ? existing.dueDate.split('T')[0] : '',
-    notes:   existing?.notes  ?? '',
+    notes: existing?.notes ?? '',
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState('');
+  const [error, setError] = useState('');
 
   const handleSave = async () => {
     if (!form.amount) return setError('Amount is required');
     setSaving(true);
     try {
       const payload = { ...form, amount: parseFloat(form.amount), dueDate: form.dueDate || null };
-      const result  = isEdit
+      const result = isEdit
         ? await paymentAPI.updateInstallment(scheduleId, existing.id, payload)
         : await paymentAPI.addInstallment(scheduleId, payload);
       if (result.error) throw new Error(result.error);
@@ -302,24 +301,24 @@ function InstallmentModal({ scheduleId, existing, tasks, onSave, onClose }) {
 
 function RecordPaymentModal({ scheduleId, installment, onSave, onClose }) {
   const alreadyPaid = parseFloat(installment.paidAmount ?? 0);
-  const instTotal   = parseFloat(installment.amount);
-  const remaining   = Math.max(0, instTotal - alreadyPaid);
+  const instTotal = parseFloat(installment.amount);
+  const remaining = Math.max(0, instTotal - alreadyPaid);
 
   const [form, setForm] = useState({
-    amount:          remaining > 0 ? remaining.toFixed(2) : '',
-    paymentDate:     new Date().toISOString().split('T')[0],
-    paymentMode:     'BANK_TRANSFER',
+    amount: remaining > 0 ? remaining.toFixed(2) : '',
+    paymentDate: new Date().toISOString().split('T')[0],
+    paymentMode: 'BANK_TRANSFER',
     referenceNumber: '',
-    notes:           '',
+    notes: '',
   });
   const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState('');
+  const [error, setError] = useState('');
 
   const enteredAmount = parseFloat(form.amount || 0);
-  const newTotalPaid  = alreadyPaid + (enteredAmount > 0 ? enteredAmount : 0);
-  const newRemaining  = Math.max(0, instTotal - newTotalPaid);
-  const isPartial     = enteredAmount > 0 && newRemaining > 0.5;
-  const isOverpaying  = enteredAmount > remaining + 0.5;
+  const newTotalPaid = alreadyPaid + (enteredAmount > 0 ? enteredAmount : 0);
+  const newRemaining = Math.max(0, instTotal - newTotalPaid);
+  const isPartial = enteredAmount > 0 && newRemaining > 0.5;
+  const isOverpaying = enteredAmount > remaining + 0.5;
 
   const handleSave = async () => {
     setError('');
@@ -381,7 +380,7 @@ function RecordPaymentModal({ scheduleId, installment, onSave, onClose }) {
               <label className="field-label">Payment mode</label>
               <select className="field-input" value={form.paymentMode}
                 onChange={e => setForm(p => ({ ...p, paymentMode: e.target.value }))}>
-                {['BANK_TRANSFER','CHEQUE','CASH','UPI','NEFT','RTGS','IMPS'].map(m => (
+                {['BANK_TRANSFER', 'CHEQUE', 'CASH', 'UPI', 'NEFT', 'RTGS', 'IMPS'].map(m => (
                   <option key={m} value={m}>{m.replace('_', ' ')}</option>
                 ))}
               </select>
@@ -425,9 +424,9 @@ function RecordPaymentModal({ scheduleId, installment, onSave, onClose }) {
 
 function ReviewModal({ scheduleId, installment, onSave, onClose }) {
   const [action, setAction] = useState('APPROVE');
-  const [notes, setNotes]   = useState('');
+  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState('');
+  const [error, setError] = useState('');
 
   const handleSave = async () => {
     setSaving(true);
@@ -452,7 +451,7 @@ function ReviewModal({ scheduleId, installment, onSave, onClose }) {
         <div className="modal-body">
           <p className="review-inst-name">{installment.title} — {inr(installment.amount)}</p>
           <div className="review-action-row">
-            {['APPROVE','REJECT'].map(a => (
+            {['APPROVE', 'REJECT'].map(a => (
               <button key={a}
                 className={`review-action-btn ${action === a ? (a === 'APPROVE' ? 'selected-approve' : 'selected-reject') : ''}`}
                 onClick={() => setAction(a)}>
@@ -482,15 +481,15 @@ function ReviewModal({ scheduleId, installment, onSave, onClose }) {
 // ─── Installment Row ──────────────────────────────────────────────────────────
 
 function InstallmentRow({ inst, scheduleId, tasks, userRole, onUpdate, onDelete }) {
-  const [menuOpen,    setMenuOpen]    = useState(false);
-  const [modal,       setModal]       = useState(null);
-  const [requesting,  setRequesting]  = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [modal, setModal] = useState(null);
+  const [requesting, setRequesting] = useState(false);
 
-  const canAdmin   = userRole === 'SUPER_ADMIN';
-  const canFinance = ['SUPER_ADMIN','FINANCE'].includes(userRole);
-  const es         = inst.effectiveStatus;
+  const canAdmin = userRole === 'SUPER_ADMIN';
+  const canFinance = ['SUPER_ADMIN', 'FINANCE'].includes(userRole);
+  const es = inst.effectiveStatus;
   const paidAmount = parseFloat(inst.paidAmount ?? 0);
-  const paidPct    = inst.amount > 0
+  const paidPct = inst.amount > 0
     ? Math.min(100, Math.round((paidAmount / parseFloat(inst.amount)) * 100))
     : 0;
 
@@ -617,9 +616,9 @@ function SummaryBar({ summary, totalAmount }) {
       </div>
       <div className="summary-stats">
         {[
-          { label: 'Paid',    val: countPaid,                   color: '#1a6b4a' },
+          { label: 'Paid', val: countPaid, color: '#1a6b4a' },
           { label: 'Pending', val: countPending + countPartial, color: '#78716c' },
-          { label: 'Overdue', val: countOverdue,                color: '#b91c1c' },
+          { label: 'Overdue', val: countOverdue, color: '#b91c1c' },
         ].map(s => (
           <div key={s.label} className="summary-stat">
             <span className="summary-stat-val" style={{ color: s.color }}>{s.val}</span>
@@ -641,14 +640,14 @@ function SummaryBar({ summary, totalAmount }) {
 
 export default function PaymentScheduleManager({
   projectId,
-  tasks    = [],
+  tasks = [],
   userRole = 'SUPER_ADMIN',
 }) {
   const [schedule, setSchedule] = useState(null);
-  const [summary,  setSummary]  = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [modal,    setModal]    = useState(null);
-  const [error,    setError]    = useState('');
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(null);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -686,7 +685,7 @@ export default function PaymentScheduleManager({
   // installment update on screen instantly while the totals catch up.
   const refreshSummary = useCallback((scheduleId) => {
     if (!scheduleId) return;
-    paymentAPI.getSummary(scheduleId).then(setSummary).catch(() => {});
+    paymentAPI.getSummary(scheduleId).then(setSummary).catch(() => { });
   }, []);
 
   const handleInstUpdate = (updated) => {
