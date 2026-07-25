@@ -10,7 +10,7 @@ const ROLES = [
   { value: 'CLIENT',          label: 'Client'          },
   { value: 'SUPER_ADMIN',     label: 'Super Admin'     },
   { value: 'SUPER_ADMIN_VIEW',     label: 'Super Admin View'     },
-  { value: 'JUNIOR_ENGINEER ',     label: 'Junior Engineer '     },
+  { value: 'JUNIOR_ENGINEER',     label: 'Junior Engineer'},
 ];
 
 function Err({ msg }) {

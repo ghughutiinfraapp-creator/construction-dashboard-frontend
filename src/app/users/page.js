@@ -11,7 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
-const ROLES = ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER','FINANCE','DELIVERY_PERSON','CLIENT','JUNIOR_ENGINEER '];
+const ROLES = ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER','FINANCE','DELIVERY_PERSON','CLIENT','JUNIOR_ENGINEER'];
 
 const ROLE_COLOURS = {
   SUPER_ADMIN:     'bg-stone-800 text-white',
@@ -26,7 +26,7 @@ const ROLE_COLOURS = {
 const ROLE_LABELS = {
   SUPER_ADMIN:'Super Admin', SUPER_ADMIN_VIEW: 'Super Admin View', PROJECT_MANAGER:'Project Manager',
   SITE_ENGINEER:'Site Engineer', FINANCE:'Finance',
-  DELIVERY_PERSON:'Delivery Person', CLIENT:'Client',JUNIOR_ENGINEER :'Junior Engineer',
+  DELIVERY_PERSON:'Delivery Person', CLIENT:'Client',JUNIOR_ENGINEER:'Junior Engineer',
 };
 
 function DotsIcon() {
