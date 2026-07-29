@@ -304,7 +304,7 @@ export default function DashboardPage() {
         {/* ── 2. KPI strip ──────────────────────────────────────────────────── */}
         <Section label="At a glance">
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}
             </div>
           ) : (
@@ -322,6 +322,16 @@ export default function DashboardPage() {
                   loading={loading}
                 />
               )}
+                {canSeeBudget && (
+    <StatCard
+      label="Estimated Budget"
+      value={stats ? fmt(Number(stats.totalEstimatedBudget || 0)) : '—'}
+      sub="sum across all projects"
+      icon={<MoneyIcon />}
+      color="stone"
+      loading={loading}
+    />
+  )}
             </div>
           )}
         </Section>

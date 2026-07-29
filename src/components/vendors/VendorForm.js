@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import clsx from 'clsx';
 
-export default function VendorForm({ initial, projects = [], onSubmit, onCancel }) {
+export default function VendorForm({ initial, onSubmit, onCancel }) {
   const [formData, setFormData] = useState({
     name: initial?.name || '',
-    contactName: initial?.contactName || '',
     phone: initial?.phone || '',
     email: initial?.email || '',
     address: initial?.address || '',
@@ -14,7 +13,6 @@ export default function VendorForm({ initial, projects = [], onSubmit, onCancel 
     accountHolderName: initial?.accountHolderName || '',
     credit: initial?.credit || '',
     paid: initial?.paid || '',
-    projectId: initial?.projectId || '',
   });
 
   const [loading, setLoading] = useState(false);
@@ -24,8 +22,9 @@ export default function VendorForm({ initial, projects = [], onSubmit, onCancel 
     setLoading(true);
     try {
       const payload = { ...formData };
-      if (payload.credit === '') delete payload.credit;
-      if (payload.paid === '') delete payload.paid;
+      Object.keys(payload).forEach((key) => {
+        if (payload[key] === '') delete payload[key];
+      });
       await onSubmit(payload);
     } finally {
       setLoading(false);
@@ -47,10 +46,6 @@ export default function VendorForm({ initial, projects = [], onSubmit, onCancel 
             <input required type="text" name="name" value={formData.name} onChange={handleChange} className="input w-full" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-700 mb-1">Contact Person</label>
-            <input type="text" name="contactName" value={formData.contactName} onChange={handleChange} className="input w-full" />
-          </div>
-          <div>
             <label className="block text-xs font-medium text-stone-700 mb-1">Phone</label>
             <input type="text" name="phone" value={formData.phone} onChange={handleChange} className="input w-full" />
           </div>
@@ -62,7 +57,6 @@ export default function VendorForm({ initial, projects = [], onSubmit, onCancel 
             <label className="block text-xs font-medium text-stone-700 mb-1">Address</label>
             <textarea name="address" value={formData.address} onChange={handleChange} className="input w-full" rows="2" />
           </div>
-         
         </div>
       </div>
 

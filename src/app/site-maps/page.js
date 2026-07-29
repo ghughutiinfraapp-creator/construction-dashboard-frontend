@@ -259,7 +259,7 @@ export default function SiteMapsPage() {
               <p className="text-sm text-stone-600">
                 {uploading ? 'Uploading…' : 'Drag & drop map images here, or click to browse'}
               </p>
-              <p className="text-xs text-stone-400">JPG, PNG or WEBP — you can select multiple files</p>
+              <p className="text-xs text-stone-400">JPG, PNG,PDF or WEBP — you can select multiple files</p>
               <input
                 ref={fileInputRef}
                 type="file"

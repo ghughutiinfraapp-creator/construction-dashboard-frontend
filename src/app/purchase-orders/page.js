@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect,useRef } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import POStatusPipeline from '../../components/purchase-orders/POStatusPipeline';
 import PODetailDrawer from '../../components/purchase-orders/PODetailDrawer';
@@ -85,17 +85,38 @@ function DeletePOConfirm({ po, onConfirm, onCancel }) {
 }
 
 // ── Inline row action menu ────────────────────────────────────────────
+
+
 function RowActions({ po, userRole, onAction, onView, onDelete }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState({ top: 0, left: 0, openUp: false });
+  const btnRef = useRef(null);
 
   const canApprove        = ['FINANCE','SUPER_ADMIN'].includes(userRole) && po.status === 'SUBMITTED';
-  const canReject         = ['FINANCE','SUPER_ADMIN'].includes(userRole) && po.status === 'SUBMITTED';
+  const canReject          = ['FINANCE','SUPER_ADMIN'].includes(userRole) && po.status === 'SUBMITTED';
   const canAssignVendor   = ['FINANCE','SUPER_ADMIN'].includes(userRole) && po.status === 'APPROVED';
   const canAssignDelivery = ['FINANCE','PROJECT_MANAGER','SUPER_ADMIN'].includes(userRole) && po.status === 'VENDOR_ASSIGNED';
-  // Delete — SUPER_ADMIN only, any status
   const canDelete         = userRole === 'SUPER_ADMIN';
 
   const hasActions = canApprove || canReject || canAssignVendor || canAssignDelivery || canDelete;
+
+  const MENU_HEIGHT = 44 * [canApprove, canReject, canAssignVendor, canAssignDelivery, canDelete].filter(Boolean).length + 8;
+  const MENU_WIDTH = 176; // w-44
+
+  const toggleOpen = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < MENU_HEIGHT + 12;
+
+      setPos({
+        top: openUp ? rect.top - MENU_HEIGHT - 4 : rect.bottom + 4,
+        left: Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - 8),
+        openUp,
+      });
+    }
+    setOpen(p => !p);
+  };
 
   return (
     <div className="relative flex items-center gap-1 justify-end">
@@ -107,11 +128,11 @@ function RowActions({ po, userRole, onAction, onView, onDelete }) {
         View →
       </button>
 
-      {/* Actions menu — only shown if role has pending actions */}
       {hasActions && (
         <>
           <button
-            onClick={() => setOpen(p => !p)}
+            ref={btnRef}
+            onClick={toggleOpen}
             className="w-7 h-7 flex items-center justify-center rounded-lg
                        hover:bg-stone-100 text-stone-400 hover:text-stone-600 transition-colors">
             <DotsIcon />
@@ -119,8 +140,11 @@ function RowActions({ po, userRole, onAction, onView, onDelete }) {
 
           {open && (
             <>
-              <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-              <div className="absolute right-0 top-8 z-20 w-44 card shadow-lg overflow-hidden animate-fade-in">
+              <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+              <div
+                className="fixed z-50 w-44 card shadow-lg overflow-hidden animate-fade-in"
+                style={{ top: pos.top, left: pos.left }}
+              >
                 {canApprove && (
                   <button
                     onClick={() => { onAction('approve', po); setOpen(false); }}

@@ -151,7 +151,7 @@ export default function VendorDetailPage() {
               <div className={`p-3 rounded-lg ${balance > 0 ? 'bg-red-50' : balance < 0 ? 'bg-green-50' : 'bg-stone-50'}`}>
                 <div className="text-[10px] text-stone-500 uppercase tracking-wide mb-1">Current Balance</div>
                 <div className={`text-lg font-mono font-medium ${balance > 0 ? 'text-red-700' : balance < 0 ? 'text-green-700' : 'text-stone-800'}`}>
-                  ₹{Math.abs(balance).toLocaleString()} {balance > 0 ? 'Cr' : balance < 0 ? 'Adv' : ''}
+                  ₹{Math.abs(balance).toLocaleString()} {balance > 0 ? 'Credit' : balance < 0 ? 'Adv' : ''}
                 </div>
               </div>
             </div>

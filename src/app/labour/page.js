@@ -90,7 +90,7 @@ export default function LabourPage() {
       await addLabourer(payload); // hook already toasts success
       setAddOpen(false);
     } catch (err) {
-      toast.error(err?.response?.data?.error || 'Failed to add labourer');
+      toast.error(err?.response?.data?.error || 'Failed to sub-contractor');
       throw err;
     }
   };
@@ -176,7 +176,11 @@ export default function LabourPage() {
               </button>
               <button className="btn-primary text-xs px-3 py-1.5"
                 onClick={() => setAddOpen(true)}>
-                <PlusIcon /> Add Labourer
+                <div className='flex flex-col items-center gap-1'>
+                 <PlusIcon />
+                 <p>Sub-Contractor</p>
+                </div>
+                
               </button>
             </>
           )}
@@ -283,7 +287,7 @@ export default function LabourPage() {
                     : 'Add the first labourer to get started'}
                   action={canManage && !filters.projectId && !filters.tradeType && !search && (
                     <button className="btn-primary text-xs" onClick={() => setAddOpen(true)}>
-                      Add Labourer
+                      Sub-Contractor
                     </button>
                   )}
                 />
@@ -449,7 +453,7 @@ export default function LabourPage() {
       </div>
 
       {/* ── Add Labourer Modal ── */}
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Labourer" width="max-w-lg">
+      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Sub-Contractor" width="max-w-lg">
         <LabourerForm
           onSubmit={handleAddLabourer}
           onCancel={() => setAddOpen(false)}

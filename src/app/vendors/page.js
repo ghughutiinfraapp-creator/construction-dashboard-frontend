@@ -131,7 +131,7 @@ export default function VendorsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-mono font-medium ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          ₹{Math.abs(balance).toLocaleString()} {balance > 0 ? 'Cr' : balance < 0 ? 'Adv' : ''}
+                          ₹{Math.abs(balance).toLocaleString()} {balance > 0 ? 'Credit' : balance < 0 ? 'Advance' : ''}
                         </span>
                       </td>
                       <td className="px-4 py-3">

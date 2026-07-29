@@ -12,7 +12,7 @@ export default function Modal({ open, onClose, title, children, width = 'max-w-l
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-stone-900/30 backdrop-blur-[2px]" onClick={onClose}/>
-      <div className={`relative bg-white rounded-2xl shadow-xl w-full ${width} animate-fade-in max-h-[90vh] flex flex-col`}>
+      <div className={`relative bg-white rounded-2xl shadow-xl w-full ${width} animate-fade-in max-h-[90vh] flex flex-col `}>
         {title && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 flex-shrink-0">
             <h2 className="text-sm font-semibold text-stone-800">{title}</h2>
