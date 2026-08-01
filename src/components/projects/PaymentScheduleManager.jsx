@@ -71,7 +71,6 @@ function ProgressBar({ value, total, color = '#1a6b4a' }) {
     </div>
   );
 }
-
 // ─── Create / Edit Schedule Modal ─────────────────────────────────────────────
 
 function ScheduleModal({ existing, tasks, projectId, onSave, onClose }) {
