@@ -517,7 +517,7 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
                 Next →
               </button>
             ) : (
-              <button type="button" className="btn-amber" disabled={submitting}
+              <button type="button" className="btn-amber px-4" disabled={submitting}
                 onClick={handleSubmit}>
                 {submitting
                   ? <><Spinner size={13}/> Submitting…</>

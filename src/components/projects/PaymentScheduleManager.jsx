@@ -34,6 +34,10 @@ const paymentAPI = {
 
   getSummary: (scheduleId) =>
     api.get(`/payment-schedules/${scheduleId}/summary`).then(r => r.data),
+
+  // NEW — fetch full payment history for a single installment
+  getInstallmentPayments: (scheduleId, iid) =>
+    api.get(`/payment-schedules/${scheduleId}/installments/${iid}/payments`).then(r => r.data),
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -478,6 +482,81 @@ function ReviewModal({ scheduleId, installment, onSave, onClose }) {
   );
 }
 
+// ─── Payment History Modal — shows every payment recorded against an installment ──
+
+function PaymentHistoryModal({ scheduleId, installment, onClose }) {
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await paymentAPI.getInstallmentPayments(scheduleId, installment.id);
+        if (!cancelled) setPayments(data.payments || []);
+      } catch (e) {
+        if (!cancelled) setError(e.response?.data?.error || e.message || 'Failed to load payment history');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [scheduleId, installment.id]);
+
+  const paidAmount = parseFloat(installment.paidAmount ?? 0);
+  const instAmount = parseFloat(installment.amount);
+  const remaining = Math.max(0, instAmount - paidAmount);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box modal-box-sm" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">Payment history — {installment.title}</h2>
+          <button className="icon-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="pay-meta" style={{ marginBottom: 16 }}>
+            <span className="pay-meta-label">{inr(instAmount)} total</span>
+            <span className="pay-meta-remaining">
+              {inr(paidAmount)} paid{remaining > 0 ? ` · ${inr(remaining)} remaining` : ' · fully settled'}
+            </span>
+          </div>
+
+          {loading && <p className="field-hint">Loading payments…</p>}
+          {error && <div className="error-banner">{error}</div>}
+
+          {!loading && !error && (
+            payments.length === 0 ? (
+              <p className="field-hint">No payments recorded against this installment yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {payments.map(p => (
+                  <div key={p.id} style={{ border: '1px solid #e7e5e4', borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#1a6b4a' }}>{inr(p.amount)}</span>
+                      <span style={{ fontSize: 12, color: '#78716c' }}>{fmtDate(p.paymentDate)}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                      <span className="inst-task-chip">{(p.paymentMode || '').replace('_', ' ')}</span>
+                      {p.referenceNumber && <span className="inst-task-chip">Ref: {p.referenceNumber}</span>}
+                      {p.recordedBy?.name && <span className="inst-task-chip">By {p.recordedBy.name}</span>}
+                    </div>
+                    {p.notes && <p style={{ fontSize: 12, color: '#57534e', marginTop: 6 }}>{p.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            )
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Installment Row ──────────────────────────────────────────────────────────
 
 function InstallmentRow({ inst, scheduleId, tasks, userRole, onUpdate, onDelete }) {
@@ -562,6 +641,13 @@ function InstallmentRow({ inst, scheduleId, tasks, userRole, onUpdate, onDelete 
               {paidAmount > 0 ? 'Add Payment' : 'Record Pay'}
             </button>
           )}
+          <button
+            className="action-btn"
+            style={{ background: '#f5f5f4', color: '#44403c' }}
+            onClick={() => setModal('history')}
+          >
+            View
+          </button>
           <div style={{ position: 'relative' }}>
             <button className="icon-btn-menu" onClick={() => setMenuOpen(p => !p)}>⋮</button>
             {menuOpen && (
@@ -592,6 +678,10 @@ function InstallmentRow({ inst, scheduleId, tasks, userRole, onUpdate, onDelete 
       {modal === 'review' && (
         <ReviewModal scheduleId={scheduleId} installment={inst}
           onSave={(u) => { onUpdate(u); setModal(null); }} onClose={() => setModal(null)} />
+      )}
+      {modal === 'history' && (
+        <PaymentHistoryModal scheduleId={scheduleId} installment={inst}
+          onClose={() => setModal(null)} />
       )}
     </>
   );
@@ -768,9 +858,9 @@ export default function PaymentScheduleManager({
         .badge-paid     { background: #d1fae5; color: #065f46; }
 
         .inst-table { border: 1px solid #e7e5e4; border-radius: 12px; overflow: hidden; margin-bottom: 12px; max-height: 380px; overflow-y: auto; }
-        .inst-table-head { display: grid; grid-template-columns: 40px 1fr 120px 120px 110px 110px 160px; padding: 10px 14px; background: #fafaf9; border-bottom: 1px solid #e7e5e4; position: sticky; top: 0; z-index: 1; }
+        .inst-table-head { display: grid; grid-template-columns: 40px 1fr 120px 120px 110px 110px 200px; padding: 10px 14px; background: #fafaf9; border-bottom: 1px solid #e7e5e4; position: sticky; top: 0; z-index: 1; }
         .inst-table-head span { font-size: 10px; font-weight: 600; color: #a8a29e; text-transform: uppercase; letter-spacing: 0.5px; }
-        .inst-table-row  { display: grid; grid-template-columns: 40px 1fr 120px 120px 110px 110px 160px; padding: 12px 14px; border-bottom: 1px solid #f5f5f4; align-items: center; }
+        .inst-table-row  { display: grid; grid-template-columns: 40px 1fr 120px 120px 110px 110px 200px; padding: 12px 14px; border-bottom: 1px solid #f5f5f4; align-items: center; }
         .inst-table-row:last-child { border-bottom: none; }
         .inst-table-row:hover { background: #fafaf9; }
         .inst-col-no     { font-size: 12px; color: #a8a29e; font-weight: 500; }
@@ -783,7 +873,7 @@ export default function PaymentScheduleManager({
         .inst-col-status { display: flex; flex-direction: column; gap: 4px; }
         .mini-progress   { height: 3px; background: #f5f5f4; border-radius: 99px; overflow: hidden; width: 60px; }
         .mini-progress-fill { height: 100%; background: #1d4ed8; border-radius: 99px; }
-        .inst-col-actions { display: flex; align-items: center; gap: 6px; }
+        .inst-col-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .action-btn      { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; border: none; cursor: pointer; white-space: nowrap; }
         .action-btn-request { background: #fef3c7; color: #92400e; }
         .action-btn-request:hover { background: #fde68a; }

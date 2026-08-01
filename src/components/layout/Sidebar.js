@@ -18,7 +18,7 @@ const NAV = [
       { href: '/tasks', label: 'Tasks', icon: TaskIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER'] },
       { href: '/attendance', label: 'Attendance', icon: AttendIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER'] },
       { href: '/labour', label: 'Sub-Contractor', icon: LabourIcon, roles: ['SUPER_ADMIN','SUPER_ADMIN_VIEW','PROJECT_MANAGER','SITE_ENGINEER'] },
-      { href: '/site-maps', label: 'Site Maps', icon: SiteMapIcon, roles: ['PROJECT_MANAGER'] },
+      { href: '/site-maps', label: 'Site Designs', icon: SiteMapIcon, roles: ['PROJECT_MANAGER'] },
     ]
   },
   {

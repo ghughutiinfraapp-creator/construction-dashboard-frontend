@@ -54,10 +54,13 @@ function TrashIcon() {
   );
 }
 
+
+
 // ── Delete confirm ───────────────────────────────────────────────────
 function DeletePOConfirm({ po, onConfirm, onCancel }) {
   const [busy, setBusy] = useState(false);
   if (!po) return null;
+  
   return (
     <div className="p-5 space-y-4">
       <p className="text-sm text-stone-600 leading-relaxed">
@@ -117,6 +120,7 @@ function RowActions({ po, userRole, onAction, onView, onDelete }) {
     }
     setOpen(p => !p);
   };
+  console.log(po)
 
   return (
     <div className="relative flex items-center gap-1 justify-end">
@@ -305,7 +309,7 @@ export default function PurchaseOrdersPage() {
   const [deliveryPO, setDeliveryPO] = useState(null);
   const [deletePO,   setDeletePO]   = useState(null); // PO pending delete confirmation
 
-  const canCreate = user && ['SITE_ENGINEER','PROJECT_MANAGER','SUPER_ADMIN'].includes(user.role);
+  const canCreate = user && ['SITE_ENGINEER','PROJECT_MANAGER'].includes(user.role);
 
   useEffect(() => {
     projectsAPI.getAll({ limit: 100 })
