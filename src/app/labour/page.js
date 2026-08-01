@@ -4,6 +4,8 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import LabourerForm from '../../components/labour/LabourerForm';
 import BulkAttendanceForm from '../../components/labour/BulkAttendanceForm';
 import WageReportTable from '../../components/labour/WageReportTable';
+import LabourRecordPaymentForm from '../../components/labour/LabourRecordPaymentForm';
+import LabourPaymentHistory from '../../components/labour/LabourPaymentHistory';
 import Modal from '../../components/ui/Modal';
 import EmptyState from '../../components/ui/EmptyState';
 import Badge from '../../components/ui/Badge';
@@ -27,6 +29,55 @@ function SearchIcon() {
     <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
   </svg>;
 }
+function EditIcon() {
+  return <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+    <path d="M11.3 2.3a1.5 1.5 0 0 1 2.1 2.1L5.8 12l-2.9.7.7-2.9 7.7-7.5z"
+      stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" strokeLinecap="round" />
+  </svg>;
+}
+function PaymentIcon() {
+  return <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+    <rect x="1.5" y="3.5" width="13" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+    <path d="M1.5 6.5h13" stroke="currentColor" strokeWidth="1.3" />
+    <path d="M4 9.5h3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+  </svg>;
+}
+function EyeIcon() {
+  return <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+    <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    <circle cx="8" cy="8" r="2.1" stroke="currentColor" strokeWidth="1.3" />
+  </svg>;
+}
+
+function RowActionButton({ icon, label, onClick, tone = 'stone' }) {
+  const tones = {
+    stone: 'text-stone-500 hover:text-stone-700 hover:bg-stone-100',
+    green: 'text-green-600 hover:text-green-700 hover:bg-green-50',
+    amber: 'text-amber-600 hover:text-amber-700 hover:bg-amber-50',
+  };
+  return (
+    <div className="relative group/tip">
+      <button
+        type="button"
+        aria-label={label}
+        onClick={onClick}
+        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${tones[tone]}`}
+      >
+        {icon}
+      </button>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5
+                   whitespace-nowrap rounded-md bg-stone-800 px-2 py-1 text-[10px] font-medium
+                   text-white opacity-0 scale-95 transition-all duration-100
+                   group-hover/tip:opacity-100 group-hover/tip:scale-100 z-10"
+      >
+        {label}
+        <span className="absolute left-1/2 -translate-x-1/2 top-full border-4 border-transparent border-t-stone-800" />
+      </span>
+    </div>
+  );
+}
 
 export default function LabourPage() {
   const { user } = useAuth();
@@ -36,6 +87,7 @@ export default function LabourPage() {
     labFiltersRef,
     loadLabourers, addLabourer, updateLabourer,
     markAttendance, loadWageReport,
+    payments, paymentsLoading, loadPayments, recordPayment,
   } = useLabour();
 
   const [tab, setTab] = useState('labourers'); // 'labourers' | 'wages'
@@ -57,12 +109,22 @@ export default function LabourPage() {
   const [attendOpen, setAttendOpen] = useState(false);
   const [attendProject, setAttendProject] = useState('');
 
-  // Inline edit state for Contract Amount / Amount Paid
+  // Payments — two separate modals, matching the record-vs-history split
+  // used for project payment schedules. Neither supports editing/deleting
+  // a past entry; you can only add a new one and view what's there.
+  const [recordPaymentFor, setRecordPaymentFor] = useState(null); // labourer object
+  const [historyFor, setHistoryFor] = useState(null);             // labourer object
+
+  // Inline edit state for Contract Amount (Amount Paid is no longer editable here —
+  // it's a running total maintained server-side from payment records)
   const [editingId, setEditingId] = useState(null);
-  const [editValues, setEditValues] = useState({ proposedAmount: '', amountPaid: '' });
+  const [editValues, setEditValues] = useState({ proposedAmount: '' });
   const [saving, setSaving] = useState(false);
 
   const canManage = user && ['SITE_ENGINEER', 'PROJECT_MANAGER', 'SUPER_ADMIN'].includes(user.role);
+  // Recording a payment is restricted server-side to these roles. Viewing
+  // history stays open to everyone (GET .../payments has no role check).
+  const canRecordPayment = user && ['SUPER_ADMIN', 'FOREMAN'].includes(user.role);
 
   useEffect(() => {
     projectsAPI.getAll({ limit: 100 })
@@ -115,42 +177,52 @@ export default function LabourPage() {
     loadWageReport(wageFilters);
   };
 
-  // ── Inline edit: Contract Amount / Amount Paid ──────────────────────
+  // ── Inline edit: Contract Amount only ───────────────────────────────
   const startEdit = (l) => {
     setEditingId(l.id);
-    setEditValues({
-      proposedAmount: String(l.proposedAmount ?? ''),
-      amountPaid: String(l.amountPaid ?? ''),
-    });
+    setEditValues({ proposedAmount: String(l.proposedAmount ?? '') });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditValues({ proposedAmount: '', amountPaid: '' });
+    setEditValues({ proposedAmount: '' });
   };
 
   const saveEdit = async (id) => {
     const proposedAmount = parseFloat(editValues.proposedAmount);
-    const amountPaid = parseFloat(editValues.amountPaid);
 
     if (isNaN(proposedAmount) || proposedAmount <= 0) {
       toast.error('Enter a valid contract amount');
       return;
     }
-    if (isNaN(amountPaid) || amountPaid < 0) {
-      toast.error('Enter a valid amount paid');
-      return;
-    }
 
     setSaving(true);
     try {
-      await updateLabourer(id, { proposedAmount, amountPaid });
+      await updateLabourer(id, { proposedAmount });
       cancelEdit();
     } catch (err) {
-      toast.error(err?.response?.data?.error || 'Failed to update amounts');
+      toast.error(err?.response?.data?.error || 'Failed to update contract amount');
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── Payments: record ────────────────────────────────────────────────
+  const handleRecordPayment = async (payload) => {
+    if (!recordPaymentFor) return;
+    try {
+      await recordPayment(recordPaymentFor.id, payload);
+      setRecordPaymentFor(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to record payment');
+      throw err;
+    }
+  };
+
+  // ── Payments: history (loaded fresh each time the modal opens) ──────
+  const openHistory = (l) => {
+    setHistoryFor(l);
+    loadPayments(l.id);
   };
 
   // Labourers for the selected attendance project
@@ -296,7 +368,7 @@ export default function LabourPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-stone-100 bg-stone-25">
-                        {['Name', 'Trade', 'Project', 'Contract Amount', 'Amount Paid', 'Phone', 'Aadhaar', canManage ? 'Actions' : null]
+                        {['Name', 'Trade', 'Project', 'Contract Amount', 'Amount Paid', 'Phone', 'Aadhaar', 'Actions']
                           .filter(Boolean)
                           .map(h => (
                             <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
@@ -347,18 +419,11 @@ export default function LabourPage() {
                               )}
                             </td>
                             <td className="px-4 py-3">
-                              {isEditing ? (
-                                <input
-                                  type="number" min="0" step="0.01"
-                                  className="input text-xs w-24 py-1"
-                                  value={editValues.amountPaid}
-                                  onChange={e => setEditValues(p => ({ ...p, amountPaid: e.target.value }))}
-                                />
-                              ) : (
-                                <span className="text-xs font-mono font-medium text-green-700">
-                                  ₹{paid.toLocaleString()}
-                                </span>
-                              )}
+                              {/* Amount Paid is read-only — a running total maintained by the
+                                  backend from payment records. Use "Record Payment" to add to it. */}
+                              <span className="text-xs font-mono font-medium text-green-700">
+                                ₹{paid.toLocaleString()}
+                              </span>
                             </td>
                             <td className="px-4 py-3">
                               <span className="text-xs text-stone-500 font-mono">
@@ -370,32 +435,49 @@ export default function LabourPage() {
                                 {l.aadhaar || '—'}
                               </span>
                             </td>
-                            {canManage && (
-                              <td className="px-4 py-3">
-                                {isEditing ? (
-                                  <div className="flex gap-2">
-                                    <button
-                                      className="text-xs font-medium text-green-600 hover:underline disabled:opacity-50"
-                                      disabled={saving}
-                                      onClick={() => saveEdit(l.id)}>
-                                      {saving ? 'Saving…' : 'Save'}
-                                    </button>
-                                    <button
-                                      className="text-xs text-stone-400 hover:underline"
-                                      disabled={saving}
-                                      onClick={cancelEdit}>
-                                      Cancel
-                                    </button>
-                                  </div>
-                                ) : (
+                            <td className="px-4 py-3">
+                              {isEditing ? (
+                                <div className="flex gap-2">
                                   <button
-                                    className="text-xs text-stone-500 hover:text-stone-700 hover:underline"
-                                    onClick={() => startEdit(l)}>
-                                    Edit
+                                    className="text-xs font-medium text-green-600 hover:underline disabled:opacity-50"
+                                    disabled={saving}
+                                    onClick={() => saveEdit(l.id)}>
+                                    {saving ? 'Saving…' : 'Save'}
                                   </button>
-                                )}
-                              </td>
-                            )}
+                                  <button
+                                    className="text-xs text-stone-400 hover:underline"
+                                    disabled={saving}
+                                    onClick={cancelEdit}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  {canManage && (
+                                    <RowActionButton
+                                      icon={<EditIcon />}
+                                      label="Edit contract amount"
+                                      tone="stone"
+                                      onClick={() => startEdit(l)}
+                                    />
+                                  )}
+                                  {canRecordPayment && (
+                                    <RowActionButton
+                                      icon={<PaymentIcon />}
+                                      label="Record payment"
+                                      tone="green"
+                                      onClick={() => setRecordPaymentFor(l)}
+                                    />
+                                  )}
+                                  <RowActionButton
+                                    icon={<EyeIcon />}
+                                    label="View payment history"
+                                    tone="amber"
+                                    onClick={() => openHistory(l)}
+                                  />
+                                </div>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
@@ -478,6 +560,38 @@ export default function LabourPage() {
           onSubmit={handleMarkAttendance}
           onCancel={() => setAttendOpen(false)}
         />
+      </Modal>
+
+      {/* ── Record Payment Modal (add only, no edit) ── */}
+      <Modal
+        open={!!recordPaymentFor}
+        onClose={() => setRecordPaymentFor(null)}
+        title={recordPaymentFor ? `Record Payment — ${recordPaymentFor.name}` : 'Record Payment'}
+        width="max-w-lg"
+      >
+        {recordPaymentFor && (
+          <LabourRecordPaymentForm
+            labourer={recordPaymentFor}
+            onSubmit={handleRecordPayment}
+            onCancel={() => setRecordPaymentFor(null)}
+          />
+        )}
+      </Modal>
+
+      {/* ── Payment History Modal (view only) ── */}
+      <Modal
+        open={!!historyFor}
+        onClose={() => setHistoryFor(null)}
+        title={historyFor ? `Payment History — ${historyFor.name}` : 'Payment History'}
+        width="max-w-lg"
+      >
+        {historyFor && (
+          <LabourPaymentHistory
+            labourer={historyFor}
+            payments={payments}
+            loading={paymentsLoading}
+          />
+        )}
       </Modal>
     </DashboardLayout>
   );

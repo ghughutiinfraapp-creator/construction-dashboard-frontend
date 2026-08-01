@@ -112,10 +112,13 @@ export const taskCategoriesAPI = {
 export const labourAPI = {
   getLabourers: (params) => api.get('/labour/labourers', { params }),
   createLabourer: (data) => api.post('/labour/labourers', data),
-  updateLabourer: (id, data) => api.put(`/labour/labourers/${id}`, data), // NEW
+  updateLabourer: (id, data) => api.put(`/labour/labourers/${id}`, data),
   getAttendance: (params) => api.get('/labour/attendance', { params }),
   markAttendance: (data) => api.post('/labour/attendance/mark', data),
   getWageReport: (params) => api.get('/labour/wage-report', { params }),
+  // NEW — payment ledger
+  getPayments: (id) => api.get(`/labour/labourers/${id}/payments`),
+  addPayment: (id, data) => api.post(`/labour/labourers/${id}/payments`, data),
 };
 
 // ─── PURCHASE ORDERS ─────────────────────────────────────────────────

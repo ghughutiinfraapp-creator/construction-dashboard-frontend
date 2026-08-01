@@ -16,7 +16,7 @@ function FieldError({ msg }) {
 export default function LabourerForm({ onSubmit, onCancel }) {
   const [form, setForm] = useState({
     name: '', phone: '', aadhaar: '',
-    tradeType: '', proposedAmount: '', amountPaid: '', projectId: '',
+    tradeType: '', proposedAmount: '', projectId: '',
   });
   const [projects,   setProjects]   = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -38,8 +38,6 @@ export default function LabourerForm({ onSubmit, onCancel }) {
     if (!form.tradeType)        e.tradeType       = 'Trade type is required';
     if (!form.proposedAmount || isNaN(Number(form.proposedAmount)) || Number(form.proposedAmount) <= 0)
                                 e.proposedAmount   = 'Enter a valid contract amount';
-    if (form.amountPaid !== '' && (isNaN(Number(form.amountPaid)) || Number(form.amountPaid) < 0))
-                                e.amountPaid       = 'Enter a valid amount';
     if (!form.projectId)        e.projectId       = 'Project is required';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -53,7 +51,6 @@ export default function LabourerForm({ onSubmit, onCancel }) {
       const payload = {
         ...form,
         proposedAmount: parseFloat(form.proposedAmount),
-        amountPaid: form.amountPaid === '' ? 0 : parseFloat(form.amountPaid),
         phone:   form.phone   || undefined,
         aadhaar: form.aadhaar || undefined,
       };
@@ -96,27 +93,17 @@ export default function LabourerForm({ onSubmit, onCancel }) {
         </div>
       </div>
 
-      {/* Contract amount + Amount paid */}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="label">Estimated Contract Amount (₹) *</label>
-          <input type="number" min="0" step="0.01" className="input"
-            value={form.proposedAmount}
-            onChange={e => set('proposedAmount', e.target.value)}
-            placeholder="500" />
-          <FieldError msg={errors.proposedAmount} />
-        </div>
-        <div>
-          <label className="label">Amount Paid (₹)</label>
-          <input type="number" min="0" step="0.01" className="input"
-            value={form.amountPaid}
-            onChange={e => set('amountPaid', e.target.value)}
-            placeholder="0" />
-          <FieldError msg={errors.amountPaid} />
-        </div>
+      {/* Contract amount */}
+      <div>
+        <label className="label">Estimated Contract Amount (₹) *</label>
+        <input type="number" min="0" step="0.01" className="input"
+          value={form.proposedAmount}
+          onChange={e => set('proposedAmount', e.target.value)}
+          placeholder="500" />
+        <FieldError msg={errors.proposedAmount} />
       </div>
       <p className="text-[11px] text-stone-400 -mt-2">
-        Amount Paid can be edited any time from the labourers table.
+        Payments are recorded separately and added up automatically once the labourer is created.
       </p>
 
       {/* Phone + Aadhaar */}
@@ -143,4 +130,4 @@ export default function LabourerForm({ onSubmit, onCancel }) {
       </div>
     </form>
   );
-}  
+}
