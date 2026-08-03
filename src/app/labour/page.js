@@ -48,6 +48,13 @@ function EyeIcon() {
     <circle cx="8" cy="8" r="2.1" stroke="currentColor" strokeWidth="1.3" />
   </svg>;
 }
+function PrintIcon() {
+  return <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+    <path d="M4 6V2h8v4" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    <rect x="2" y="6" width="12" height="6" rx="1" stroke="currentColor" strokeWidth="1.3" />
+    <path d="M4 10.5h8V14H4z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+  </svg>;
+}
 
 function RowActionButton({ icon, label, onClick, tone = 'stone' }) {
   const tones = {
@@ -223,6 +230,166 @@ export default function LabourPage() {
   const openHistory = (l) => {
     setHistoryFor(l);
     loadPayments(l.id);
+  };
+
+  // ── Payments: print history for the labourer currently open ─────────
+  const handlePrintLabourPayments = () => {
+    if (!historyFor) return;
+
+    const labourer = historyFor;
+    const printWindow = window.open('', '_blank', 'width=900,height=650');
+    if (!printWindow) {
+      toast.error('Please allow pop-ups to print payment history');
+      return;
+    }
+
+    const contractAmount = Number(labourer.proposedAmount || 0);
+    const amountPaid = Number(labourer.amountPaid || 0);
+    const balance = contractAmount - amountPaid;
+
+    const rows = (payments || [])
+      .map((p) => `
+        <tr>
+          <td>${format(new Date(p.paymentDate || p.createdAt), 'MMM d, yyyy')}</td>
+          <td>${(p.paymentMode || p.mode || '—').toString().replace('_', ' ')}</td>
+          <td style="text-align:right">₹${Number(p.amount || 0).toLocaleString()}</td>
+          <td>${p.receiptNumber || '—'}</td>
+          <td>${p.recordedBy?.name || '—'}</td>
+          <td>${p.notes || '—'}</td>
+        </tr>
+      `)
+      .join('');
+
+    const totalPaid = (payments || []).reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Payment History - ${labourer.name}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              padding: 32px;
+              color: #292524;
+            }
+            h1 { font-size: 18px; margin: 0 0 4px; }
+            .sub { font-size: 12px; color: #78716c; margin-bottom: 20px; }
+            .section-title {
+              font-size: 12px;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: 0.03em;
+              color: #57534e;
+              border-bottom: 1px solid #e7e5e4;
+              padding-bottom: 6px;
+              margin: 20px 0 10px;
+            }
+            .meta {
+              display: flex;
+              gap: 24px;
+              margin-bottom: 8px;
+              font-size: 12px;
+              flex-wrap: wrap;
+            }
+            .meta div span {
+              display: block;
+              color: #78716c;
+              font-size: 10px;
+              text-transform: uppercase;
+              letter-spacing: 0.02em;
+              margin-bottom: 2px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 12px;
+              margin-top: 8px;
+            }
+            th, td {
+              padding: 8px 10px;
+              border-bottom: 1px solid #e7e5e4;
+              text-align: left;
+            }
+            th {
+              background: #f5f5f4;
+              font-size: 10px;
+              text-transform: uppercase;
+              color: #78716c;
+              letter-spacing: 0.02em;
+            }
+            tfoot td {
+              font-weight: bold;
+              border-top: 2px solid #292524;
+              border-bottom: none;
+            }
+            .footer-note {
+              margin-top: 24px;
+              font-size: 10px;
+              color: #a8a29e;
+            }
+            @media print {
+              @page { margin: 20mm; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${labourer.name}</h1>
+          <div class="sub">
+            Payment History Report &middot; Generated ${format(new Date(), 'MMM d, yyyy h:mm a')}
+          </div>
+
+          <div class="meta">
+            <div><span>Trade</span>${labourer.tradeType || '—'}</div>
+            <div><span>Project</span>${labourer.project?.name || '—'}</div>
+            <div><span>Phone</span>${labourer.phone || '—'}</div>
+            <div><span>Aadhaar</span>${labourer.aadhaar || '—'}</div>
+          </div>
+
+          <div class="section-title">Financial Summary</div>
+          <div class="meta">
+            <div><span>Contract Amount</span>₹${contractAmount.toLocaleString()}</div>
+            <div><span>Total Paid</span>₹${amountPaid.toLocaleString()}</div>
+            <div>
+              <span>Balance</span>
+              ₹${Math.abs(balance).toLocaleString()} ${balance > 0 ? 'Due' : balance < 0 ? 'Excess' : ''}
+            </div>
+          </div>
+
+          <div class="section-title">Payment Records</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Mode</th>
+                <th>Amount</th>
+                <th>Receipt No.</th>
+                <th>Recorded By</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows || '<tr><td colspan="6" style="text-align:center;color:#a8a29e">No payment records found.</td></tr>'}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2">Total</td>
+                <td style="text-align:right">₹${totalPaid.toLocaleString()}</td>
+                <td colspan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="footer-note">Generated from Labour Management System</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
 
   // Labourers for the selected attendance project
@@ -578,7 +745,7 @@ export default function LabourPage() {
         )}
       </Modal>
 
-      {/* ── Payment History Modal (view only) ── */}
+      {/* ── Payment History Modal (view + print) ── */}
       <Modal
         open={!!historyFor}
         onClose={() => setHistoryFor(null)}
@@ -586,11 +753,25 @@ export default function LabourPage() {
         width="max-w-lg"
       >
         {historyFor && (
-          <LabourPaymentHistory
-            labourer={historyFor}
-            payments={payments}
-            loading={paymentsLoading}
-          />
+          <>
+            <div className="flex justify-end px-4 pt-3">
+              <button
+                type="button"
+                className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-1.5"
+                onClick={handlePrintLabourPayments}
+                disabled={paymentsLoading || !payments?.length}
+                title={!payments?.length ? 'No payments to print' : 'Print payment history'}
+              >
+                <PrintIcon />
+                Print
+              </button>
+            </div>
+            <LabourPaymentHistory
+              labourer={historyFor}
+              payments={payments}
+              loading={paymentsLoading}
+            />
+          </>
         )}
       </Modal>
     </DashboardLayout>

@@ -738,6 +738,7 @@ export default function PaymentScheduleManager({
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
   const [error, setError] = useState('');
+  const [printing, setPrinting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -802,6 +803,244 @@ export default function PaymentScheduleManager({
     // Refresh summary counts from server (paid/overdue etc.)
     // but don't reload schedule — that would reset totalAmount from DB
     refreshSummary(schedule?.id);
+  };
+
+  // ── Print the FULL schedule — every installment together, one document ─────
+  // Includes the complete payment breakdown per installment: every individual
+  // payment entry (so partial payments, and payments split across more than
+  // one method, are all visible — not just the aggregate paid amount).
+  const handlePrintSchedule = async () => {
+    if (!schedule || printing) return;
+
+    // Open the window synchronously (before any await) so popup blockers don't
+    // intervene, then fill it in once the payment breakdowns are fetched.
+    const printWindow = window.open('', '_blank', 'width=1000,height=700');
+    if (!printWindow) {
+      alert('Please allow pop-ups to print the payment schedule');
+      return;
+    }
+    printWindow.document.write(`
+      <html><head><title>Payment Schedule</title></head>
+      <body style="font-family: Arial, Helvetica, sans-serif; padding: 32px; color: #78716c;">
+        Preparing payment schedule for print…
+      </body></html>
+    `);
+    printWindow.document.close();
+
+    setPrinting(true);
+    try {
+      const sortedInstallments = (schedule.installments || [])
+        .slice()
+        .sort((a, b) => (a.installmentNo ?? 0) - (b.installmentNo ?? 0));
+
+      // Fetch each installment's individual payment records in parallel
+      const paymentsByInst = await Promise.all(
+        sortedInstallments.map((inst) =>
+          paymentAPI.getInstallmentPayments(schedule.id, inst.id)
+            .then((d) => d.payments || [])
+            .catch(() => [])
+        )
+      );
+
+      const totalAmount = parseFloat(schedule.totalAmount || 0);
+      const totalPaid = summary?.totalPaid ?? sortedInstallments
+        .reduce((s, i) => s + parseFloat(i.paidAmount || 0), 0);
+      const totalRemaining = Math.max(0, totalAmount - totalPaid);
+      const pct = totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0;
+
+      const blocks = sortedInstallments.map((inst, idx) => {
+        const amount = parseFloat(inst.amount || 0);
+        const paid = parseFloat(inst.paidAmount || 0);
+        const remaining = Math.max(0, amount - paid);
+        const cfg = STATUS_CONFIG[inst.effectiveStatus] ?? STATUS_CONFIG.PENDING;
+        const instPayments = (paymentsByInst[idx] || [])
+          .slice()
+          .sort((a, b) => new Date(a.paymentDate) - new Date(b.paymentDate));
+
+        const paymentRows = instPayments.length
+          ? instPayments.map((p, i) => `
+              <tr class="pay-row">
+                <td class="pay-idx">${i + 1}</td>
+                <td>${fmtDate(p.paymentDate)}</td>
+                <td>${(p.paymentMode || '—').toString().replace('_', ' ')}</td>
+                <td style="text-align:right">${inr(p.amount)}</td>
+                <td>${p.referenceNumber || '—'}</td>
+                <td>${p.recordedBy?.name || '—'}</td>
+                <td>${p.notes || '—'}</td>
+              </tr>
+            `).join('')
+          : `<tr class="pay-row"><td colspan="7" style="color:#a8a29e;text-align:center">No payments recorded yet.</td></tr>`;
+
+        const methodTotals = {};
+        instPayments.forEach((p) => {
+          const mode = (p.paymentMode || 'UNKNOWN').toString().replace('_', ' ');
+          methodTotals[mode] = (methodTotals[mode] || 0) + Number(p.amount || 0);
+        });
+        const methodSummary = Object.entries(methodTotals)
+          .map(([mode, amt]) => `${mode}: ${inr(amt)}`)
+          .join(' &nbsp;+&nbsp; ');
+
+        return `
+          <div class="inst-block">
+            <div class="inst-block-head">
+              <div>
+                <span class="inst-block-no">#${inst.installmentNo ?? idx + 1}</span>
+                <span class="inst-block-title">${inst.title || '—'}</span>
+                ${inst.task?.title ? `<span class="inst-block-link">🔗 ${inst.task.title}</span>` : ''}
+              </div>
+              <span class="inst-block-status">${cfg.label}</span>
+            </div>
+            <div class="meta" style="margin: 6px 0 10px;">
+              <div><span>Installment Amount</span>${inr(amount)}</div>
+              <div><span>Paid So Far</span>${inr(paid)}</div>
+              <div><span>Remaining</span>${inr(remaining)}</div>
+              <div><span>Due Date</span>${fmtDate(inst.dueDate)}</div>
+            </div>
+            ${instPayments.length > 1
+              ? `<div class="method-summary">Paid via: ${methodSummary}</div>`
+              : ''}
+            <table class="pay-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Date</th><th>Method</th><th>Amount</th><th>Reference</th><th>Recorded By</th><th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>${paymentRows}</tbody>
+            </table>
+            ${inst.notes ? `<div class="inst-notes">Note: ${inst.notes}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+
+      printWindow.document.open();
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Payment Schedule</title>
+            <style>
+              * { box-sizing: border-box; }
+              body {
+                font-family: Arial, Helvetica, sans-serif;
+                padding: 32px;
+                color: #292524;
+              }
+              h1 { font-size: 18px; margin: 0 0 4px; }
+              .sub { font-size: 12px; color: #78716c; margin-bottom: 20px; }
+              .section-title {
+                font-size: 12px;
+                font-weight: bold;
+                text-transform: uppercase;
+                letter-spacing: 0.03em;
+                color: #57534e;
+                border-bottom: 1px solid #e7e5e4;
+                padding-bottom: 6px;
+                margin: 20px 0 10px;
+              }
+              .meta {
+                display: flex;
+                gap: 20px;
+                margin-bottom: 4px;
+                font-size: 12px;
+                flex-wrap: wrap;
+              }
+              .meta div span {
+                display: block;
+                color: #78716c;
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.02em;
+                margin-bottom: 2px;
+              }
+              table { width: 100%; border-collapse: collapse; font-size: 12px; }
+              th, td { padding: 6px 8px; border-bottom: 1px solid #e7e5e4; text-align: left; vertical-align: top; }
+              th { background: #f5f5f4; font-size: 10px; text-transform: uppercase; color: #78716c; letter-spacing: 0.02em; }
+              tfoot td { font-weight: bold; border-top: 2px solid #292524; border-bottom: none; }
+              .footer-note { margin-top: 24px; font-size: 10px; color: #a8a29e; }
+
+              .inst-block {
+                border: 1px solid #e7e5e4;
+                border-radius: 8px;
+                padding: 12px 14px;
+                margin-bottom: 14px;
+                break-inside: avoid;
+                page-break-inside: avoid;
+              }
+              .inst-block-head {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 4px;
+              }
+              .inst-block-no { font-size: 11px; color: #a8a29e; font-weight: 600; margin-right: 8px; }
+              .inst-block-title { font-size: 13px; font-weight: 700; color: #1c1917; }
+              .inst-block-link { font-size: 10px; color: #78716c; margin-left: 8px; }
+              .inst-block-status {
+                font-size: 10px;
+                font-weight: 700;
+                text-transform: uppercase;
+                background: #f5f5f4;
+                color: #44403c;
+                padding: 2px 8px;
+                border-radius: 99px;
+              }
+              .method-summary {
+                font-size: 11px;
+                color: #1a6b4a;
+                background: #f0fdf4;
+                border-radius: 6px;
+                padding: 5px 8px;
+                margin-bottom: 8px;
+                font-weight: 600;
+              }
+              .pay-table th { background: #fafaf9; }
+              .pay-row td { font-size: 11px; }
+              .pay-idx { color: #a8a29e; }
+              .inst-notes { font-size: 11px; color: #78716c; margin-top: 8px; font-style: italic; }
+
+              @media print {
+                @page { margin: 18mm; }
+              }
+            </style>
+          </head>
+          <body>
+            <h1>Payment Schedule</h1>
+            <div class="sub">
+              Generated ${fmtDate(new Date())} at ${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+              ${schedule.createdBy?.name ? ` &middot; Created by ${schedule.createdBy.name}` : ''}
+              ${schedule.notes ? ` &middot; ${schedule.notes}` : ''}
+            </div>
+
+            <div class="section-title">Summary</div>
+            <div class="meta" style="margin-bottom: 20px;">
+              <div><span>Total Contract</span>${inr(totalAmount)}</div>
+              <div><span>Total Paid</span>${inr(totalPaid)}</div>
+              <div><span>Remaining</span>${inr(totalRemaining)}</div>
+              <div><span>Collected</span>${pct}%</div>
+            </div>
+
+            <div class="section-title">Installments &amp; Payment Breakdown (${sortedInstallments.length})</div>
+            ${blocks || '<p style="color:#a8a29e;text-align:center">No installments found.</p>'}
+
+            <div class="footer-note">Generated from Project Management System &middot; each installment lists every individual payment received, including partial payments and mixed payment methods.</div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.onload = () => {
+        printWindow.print();
+      };
+    } catch (e) {
+      printWindow.document.open();
+      printWindow.document.write(`
+        <html><body style="font-family: Arial, sans-serif; padding: 32px; color: #b91c1c;">
+          Failed to prepare the payment schedule for printing. Please close this window and try again.
+        </body></html>
+      `);
+      printWindow.document.close();
+    } finally {
+      setPrinting(false);
+    }
   };
 
   const canAdmin = userRole === 'SUPER_ADMIN';
@@ -947,6 +1186,16 @@ export default function PaymentScheduleManager({
         <div className="psm-header">
           <h3 className="psm-title">Payment schedule</h3>
           <div style={{ display: 'flex', gap: 8 }}>
+            {schedule && (
+              <button
+                className="btn-outline"
+                onClick={handlePrintSchedule}
+                disabled={printing || !schedule.installments?.length}
+                title={!schedule.installments?.length ? 'No installments to print' : 'Print full schedule with payment breakdown'}
+              >
+                {printing ? 'Preparing…' : '🖨 Print schedule'}
+              </button>
+            )}
             {schedule && canAdmin && (
               <>
                 <button className="btn-outline" onClick={() => setModal('addInst')}>+ Add installment</button>

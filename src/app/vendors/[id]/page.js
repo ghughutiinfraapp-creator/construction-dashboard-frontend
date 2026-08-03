@@ -20,7 +20,7 @@ export default function VendorDetailPage() {
 
   const [vendor, setVendor] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   const [editOpen, setEditOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
 
@@ -57,17 +57,190 @@ export default function VendorDetailPage() {
   const handleRecordPayment = async (payload) => {
     try {
       await addPayment(vendor.id, payload);
-      
+
       // Auto-update paid amount
       const currentPaid = Number(vendor.paid || 0);
       const newPaid = currentPaid + payload.amount;
       await update(vendor.id, { paid: newPaid });
-      
+
       setPaymentOpen(false);
       await loadVendor();
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to record payment');
     }
+  };
+
+  const handlePrintPayments = () => {
+    if (!vendor) return;
+
+    const creditVal = Number(vendor.credit || 0);
+    const paidVal = Number(vendor.paid || 0);
+    const balanceVal = creditVal - paidVal;
+
+    const printWindow = window.open('', '_blank', 'width=900,height=650');
+    if (!printWindow) {
+      toast.error('Please allow pop-ups to print payment history');
+      return;
+    }
+
+    const rows = (vendor.payments || [])
+      .map(
+        (p) => `
+        <tr>
+          <td>${format(new Date(p.paymentDate), 'MMM d, yyyy')}</td>
+          <td>${(p.paymentMode || '').replace('_', ' ')}</td>
+          <td style="text-align:right">₹${Number(p.amount).toLocaleString()}</td>
+          <td>${p.receiptNumber || '—'}</td>
+          <td>${p.recordedBy?.name || '—'}</td>
+          <td>${p.notes || '—'}</td>
+        </tr>
+      `
+      )
+      .join('');
+
+    const totalPaid = (vendor.payments || []).reduce(
+      (sum, p) => sum + Number(p.amount || 0),
+      0
+    );
+
+    const assignedSite =
+      projects.find((p) => p.id === vendor.projectId)?.name || '—';
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Payment History - ${vendor.name}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              font-family: Arial, Helvetica, sans-serif;
+              padding: 32px;
+              color: #292524;
+            }
+            h1 { font-size: 18px; margin: 0 0 4px; }
+            .sub { font-size: 12px; color: #78716c; margin-bottom: 20px; }
+            .section-title {
+              font-size: 12px;
+              font-weight: bold;
+              text-transform: uppercase;
+              letter-spacing: 0.03em;
+              color: #57534e;
+              border-bottom: 1px solid #e7e5e4;
+              padding-bottom: 6px;
+              margin: 20px 0 10px;
+            }
+            .meta {
+              display: flex;
+              gap: 24px;
+              margin-bottom: 8px;
+              font-size: 12px;
+              flex-wrap: wrap;
+            }
+            .meta div span {
+              display: block;
+              color: #78716c;
+              font-size: 10px;
+              text-transform: uppercase;
+              letter-spacing: 0.02em;
+              margin-bottom: 2px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 12px;
+              margin-top: 8px;
+            }
+            th, td {
+              padding: 8px 10px;
+              border-bottom: 1px solid #e7e5e4;
+              text-align: left;
+            }
+            th {
+              background: #f5f5f4;
+              font-size: 10px;
+              text-transform: uppercase;
+              color: #78716c;
+              letter-spacing: 0.02em;
+            }
+            tfoot td {
+              font-weight: bold;
+              border-top: 2px solid #292524;
+              border-bottom: none;
+            }
+            .footer-note {
+              margin-top: 24px;
+              font-size: 10px;
+              color: #a8a29e;
+            }
+            @media print {
+              @page { margin: 20mm; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${vendor.name}</h1>
+          <div class="sub">
+            Payment History Report &middot; Generated ${format(
+              new Date(),
+              'MMM d, yyyy h:mm a'
+            )}
+          </div>
+
+          <div class="meta">
+            <div><span>Contact Person</span>${vendor.contactName || '—'}</div>
+            <div><span>Phone</span>${vendor.phone || '—'}</div>
+            <div><span>Assigned Site</span>${assignedSite}</div>
+          </div>
+
+          <div class="section-title">Financial Summary</div>
+          <div class="meta">
+            <div><span>Credit / Advance</span>₹${creditVal.toLocaleString()}</div>
+            <div><span>Total Paid</span>₹${paidVal.toLocaleString()}</div>
+            <div>
+              <span>Current Balance</span>
+              ₹${Math.abs(balanceVal).toLocaleString()} ${
+      balanceVal > 0 ? 'Credit' : balanceVal < 0 ? 'Adv' : ''
+    }
+            </div>
+          </div>
+
+          <div class="section-title">Payment Records</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Mode</th>
+                <th>Amount</th>
+                <th>Receipt No.</th>
+                <th>Recorded By</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                rows ||
+                '<tr><td colspan="6" style="text-align:center;color:#a8a29e">No payment records found.</td></tr>'
+              }
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colspan="2">Total</td>
+                <td style="text-align:right">₹${totalPaid.toLocaleString()}</td>
+                <td colspan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="footer-note">Generated from Vendor Management System</div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
 
   if (loading) {
@@ -104,7 +277,7 @@ export default function VendorDetailPage() {
       }
     >
       <div className="space-y-6 max-w-6xl animate-fade-in">
-        
+
         {/* Top Cards: Details & Financials */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Contact Details */}
@@ -155,7 +328,7 @@ export default function VendorDetailPage() {
                 </div>
               </div>
             </div>
-            
+
             <h3 className="text-sm font-semibold text-stone-800 border-b border-stone-100 pb-2 pt-2">Banking Details</h3>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
@@ -182,7 +355,19 @@ export default function VendorDetailPage() {
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 bg-stone-25 border-b border-stone-100">
             <h3 className="text-sm font-semibold text-stone-800">Payment History</h3>
-            <span className="text-[10px] text-stone-400 font-mono">{vendor.payments?.length || 0} record(s)</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] text-stone-400 font-mono">{vendor.payments?.length || 0} record(s)</span>
+              {canManage && (
+                <button
+                  className="btn-secondary text-md font-bold px-4 py-2"
+                  onClick={handlePrintPayments}
+                  disabled={!vendor.payments?.length}
+                  title={!vendor.payments?.length ? 'No payments to print' : 'Print payment history'}
+                >
+                  Print
+                </button>
+              )}
+            </div>
           </div>
           {vendor.payments?.length > 0 ? (
             <table className="w-full">
