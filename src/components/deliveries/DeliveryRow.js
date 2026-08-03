@@ -4,20 +4,21 @@ import { format } from 'date-fns';
 
 function DotsIcon() {
   return <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-    <circle cx="8" cy="3" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="8" cy="13" r="1.2"/>
+    <circle cx="8" cy="3" r="1.2" /><circle cx="8" cy="8" r="1.2" /><circle cx="8" cy="13" r="1.2" />
   </svg>;
 }
+
 
 import { useState } from 'react';
 
 export default function DeliveryRow({ delivery, userRole, onVerify, onRaiseIssue, onView }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { purchaseOrder, deliveryPerson, verifiedBy, status,
-          deliveredAt, verifiedAt, issueDescription } = delivery;
+    deliveredAt, verifiedAt, issueDescription } = delivery;
   const po = purchaseOrder;
 
   // Who can verify — SITE_ENGINEER and PROJECT_MANAGER
-  const canVerify = ['SITE_ENGINEER','PROJECT_MANAGER','SUPER_ADMIN'].includes(userRole)
+  const canVerify = ['SITE_ENGINEER', 'PROJECT_MANAGER', 'SUPER_ADMIN'].includes(userRole)
     && status === 'DELIVERED';
 
   return (
@@ -49,7 +50,7 @@ export default function DeliveryRow({ delivery, userRole, onVerify, onRaiseIssue
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 rounded-full bg-stone-100 flex items-center justify-center flex-shrink-0">
               <span className="text-stone-500 text-[9px] font-semibold">
-                {deliveryPerson.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+                {deliveryPerson.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
               </span>
             </div>
             <span className="text-xs text-stone-600 truncate max-w-[100px]">{deliveryPerson.name}</span>
@@ -76,8 +77,8 @@ export default function DeliveryRow({ delivery, userRole, onVerify, onRaiseIssue
           ? <span className="text-xs text-stone-500">{verifiedBy.name}</span>
           : status === 'ISSUE_RAISED'
             ? <span className="text-xs text-red-500 truncate block max-w-[100px]" title={issueDescription}>
-                Issue: {issueDescription?.slice(0, 30)}{issueDescription?.length > 30 ? '…' : ''}
-              </span>
+              Issue: {issueDescription?.slice(0, 30)}{issueDescription?.length > 30 ? '…' : ''}
+            </span>
             : <span className="text-xs text-stone-300">—</span>
         }
       </td>
@@ -106,13 +107,13 @@ export default function DeliveryRow({ delivery, userRole, onVerify, onRaiseIssue
                     <button onClick={() => { onVerify(delivery); setMenuOpen(false); }}
                       className="w-full text-left px-3 py-2 text-xs text-green-700
                                  hover:bg-green-50 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-400"/>
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
                       Verify &amp; Close PO
                     </button>
                     <button onClick={() => { onRaiseIssue(delivery); setMenuOpen(false); }}
                       className="w-full text-left px-3 py-2 text-xs text-red-600
                                  hover:bg-red-50 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400"/>
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
                       Raise Issue
                     </button>
                   </div>
