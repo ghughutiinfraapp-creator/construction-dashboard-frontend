@@ -47,3 +47,34 @@
 @keyframes slideIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
 .animate-fade-in { animation: fadeIn 0.3s ease-out; }
 .animate-slide-in { animation: slideIn 0.25s ease-out; }
+
+/* ── PRINT MEDIA STYLES ────────────────────────────────────────────── */
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+    font-size: 11pt;
+  }
+  aside, nav, header, .no-print, button, input, select, .btn {
+    display: none !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #E5E7EB !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-only {
+    display: block !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+@media screen {
+  .print-only {
+    display: none !important;
+  }
+}
+
