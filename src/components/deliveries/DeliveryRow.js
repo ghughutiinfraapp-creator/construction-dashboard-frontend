@@ -8,7 +8,6 @@ function DotsIcon() {
   </svg>;
 }
 
-
 import { useState } from 'react';
 
 export default function DeliveryRow({ delivery, userRole, onVerify, onRaiseIssue, onView }) {
