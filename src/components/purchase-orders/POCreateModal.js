@@ -12,7 +12,7 @@ const URGENCY_OPTIONS = [
 
 const UNITS = ['Bag (50kg)', 'Kg', 'Ton', 'CFT', 'CUM', 'Piece', 'Meter', 'Sqft', 'Litre', 'Nos'];
 
-const EMPTY_ITEM = {
+const EMPTY_CUSTOM_ITEM = {
   itemName: '', itemCategory: '', quantity: '', unit: 'Kg',
   unitPrice: '', brand: '', notes: '',
 };
@@ -38,11 +38,20 @@ function PlusIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+      <path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 export default function POCreateModal({ open, onSubmit, onClose }) {
   const [step, setStep]         = useState(1);  // 1=details, 2=items, 3=review
   const [projects,   setProjects]   = useState([]);
   const [categories, setCategories] = useState([]);
   const [catalog,    setCatalog]    = useState([]);
+  const [catalogSearch, setCatalogSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errors,     setErrors]     = useState({});
 
@@ -50,7 +59,10 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
     projectId: '',
     urgency:   'NORMAL',
     notes:     '',
-    items:     [{ ...EMPTY_ITEM }],
+    // catalogId -> { catalogId, itemName, itemCategory, unit, unitPrice, brand, quantity, notes }
+    selectedItems: {},
+    // manual items for anything not in the catalog
+    customItems: [],
   });
 
   // Load dropdowns once
@@ -66,7 +78,8 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
     if (!open) {
       setStep(1);
       setErrors({});
-      setForm({ projectId: '', urgency: 'NORMAL', notes: '', items: [{ ...EMPTY_ITEM }] });
+      setCatalogSearch('');
+      setForm({ projectId: '', urgency: 'NORMAL', notes: '', selectedItems: {}, customItems: [] });
     }
   }, [open]);
 
@@ -75,42 +88,62 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
     if (errors[k]) setErrors(p => ({ ...p, [k]: '' }));
   };
 
-  // ── Item helpers ──────────────────────────────────────────────────
-  const setItem = (idx, k, v) => {
+  // ── Catalog checkbox selection ───────────────────────────────────
+  const toggleCatalogItem = (item) => {
     setForm(p => {
-      const items = [...p.items];
-      items[idx] = { ...items[idx], [k]: v };
-      return { ...p, items };
+      const selectedItems = { ...p.selectedItems };
+      if (selectedItems[item.id]) {
+        delete selectedItems[item.id];
+      } else {
+        selectedItems[item.id] = {
+          catalogId:    item.id,
+          itemName:     item.name,
+          itemCategory: item.category,
+          unit:         item.unit,
+          unitPrice:    item.defaultPrice ? String(item.defaultPrice) : '',
+          brand:        item.brands?.[0] || '',
+          quantity:     '',
+          notes:        '',
+        };
+      }
+      return { ...p, selectedItems };
     });
-    // Clear item-level error
-    if (errors[`item_${idx}_${k}`]) {
-      setErrors(p => { const e = { ...p }; delete e[`item_${idx}_${k}`]; return e; });
+    if (errors[`sel_${item.id}_quantity`]) {
+      setErrors(p => { const e = { ...p }; delete e[`sel_${item.id}_quantity`]; return e; });
+    }
+    if (errors.items) setErrors(p => ({ ...p, items: '' }));
+  };
+
+  const setSelectedItemField = (catalogId, k, v) => {
+    setForm(p => ({
+      ...p,
+      selectedItems: {
+        ...p.selectedItems,
+        [catalogId]: { ...p.selectedItems[catalogId], [k]: v },
+      },
+    }));
+    if (errors[`sel_${catalogId}_${k}`]) {
+      setErrors(p => { const e = { ...p }; delete e[`sel_${catalogId}_${k}`]; return e; });
     }
   };
 
-  // When user picks from catalog, auto-fill item fields
-  const autofillFromCatalog = (idx, catalogItemId) => {
-    const found = catalog.find(c => c.id === catalogItemId);
-    if (!found) return;
+  // ── Custom (non-catalog) items ───────────────────────────────────
+  const addCustomItem = () =>
+    setForm(p => ({ ...p, customItems: [...p.customItems, { ...EMPTY_CUSTOM_ITEM }] }));
+
+  const removeCustomItem = (idx) =>
+    setForm(p => ({ ...p, customItems: p.customItems.filter((_, i) => i !== idx) }));
+
+  const setCustomItem = (idx, k, v) => {
     setForm(p => {
-      const items = [...p.items];
-      items[idx] = {
-        ...items[idx],
-        itemName:     found.name,
-        itemCategory: found.category,
-        unit:         found.unit,
-        unitPrice:    found.defaultPrice ? String(found.defaultPrice) : '',
-        brand:        found.brands?.[0] || '',
-      };
-      return { ...p, items };
+      const customItems = [...p.customItems];
+      customItems[idx] = { ...customItems[idx], [k]: v };
+      return { ...p, customItems };
     });
+    if (errors[`custom_${idx}_${k}`]) {
+      setErrors(p => { const e = { ...p }; delete e[`custom_${idx}_${k}`]; return e; });
+    }
   };
-
-  const addItem = () =>
-    setForm(p => ({ ...p, items: [...p.items, { ...EMPTY_ITEM }] }));
-
-  const removeItem = (idx) =>
-    setForm(p => ({ ...p, items: p.items.filter((_, i) => i !== idx) }));
 
   // ── Validation ────────────────────────────────────────────────────
   const validateStep1 = () => {
@@ -122,14 +155,22 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
 
   const validateStep2 = () => {
     const e = {};
-    if (form.items.length === 0) {
-      e.items = 'Add at least one item';
+    const selectedList = Object.values(form.selectedItems);
+    const totalCount = selectedList.length + form.customItems.length;
+
+    if (totalCount === 0) {
+      e.items = 'Select at least one item from the catalog, or add a custom item';
     }
-    form.items.forEach((item, idx) => {
-      if (!item.itemName.trim())     e[`item_${idx}_itemName`]     = 'Required';
-      if (!item.itemCategory.trim()) e[`item_${idx}_itemCategory`] = 'Required';
-      if (!item.quantity || Number(item.quantity) <= 0) e[`item_${idx}_quantity`] = 'Enter a valid quantity';
-      if (!item.unit)                e[`item_${idx}_unit`]         = 'Required';
+    selectedList.forEach(item => {
+      if (!item.quantity || Number(item.quantity) <= 0) {
+        e[`sel_${item.catalogId}_quantity`] = 'Enter a valid quantity';
+      }
+    });
+    form.customItems.forEach((item, idx) => {
+      if (!item.itemName.trim())     e[`custom_${idx}_itemName`]     = 'Required';
+      if (!item.itemCategory.trim()) e[`custom_${idx}_itemCategory`] = 'Required';
+      if (!item.quantity || Number(item.quantity) <= 0) e[`custom_${idx}_quantity`] = 'Enter a valid quantity';
+      if (!item.unit)                e[`custom_${idx}_unit`]         = 'Required';
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -142,6 +183,12 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
 
   const handleBack = () => setStep(s => s - 1);
 
+  // Combined, normalized list used for review + total + submit
+  const allItems = [
+    ...Object.values(form.selectedItems),
+    ...form.customItems,
+  ];
+
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
@@ -149,7 +196,7 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
         projectId: form.projectId,
         urgency:   form.urgency,
         notes:     form.notes || undefined,
-        items: form.items.map(item => ({
+        items: allItems.map(item => ({
           itemName:     item.itemName.trim(),
           itemCategory: item.itemCategory.trim(),
           quantity:     parseFloat(item.quantity),
@@ -169,13 +216,19 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
   };
 
   // Estimated total from items with prices
-  const estimatedTotal = form.items.reduce((sum, item) => {
+  const estimatedTotal = allItems.reduce((sum, item) => {
     const price = parseFloat(item.unitPrice) || 0;
     const qty   = parseFloat(item.quantity)  || 0;
     return sum + price * qty;
   }, 0);
 
   const selectedProject = projects.find(p => p.id === form.projectId);
+  const selectedCount   = allItems.length;
+
+  const filteredCatalog = catalog.filter(c =>
+    !catalogSearch.trim() ||
+    c.name.toLowerCase().includes(catalogSearch.trim().toLowerCase())
+  );
 
   const STEP_LABELS = ['Details', 'Items', 'Review'];
 
@@ -270,124 +323,188 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
                 <p className="text-red-500 text-xs bg-red-50 px-3 py-2 rounded-lg">{errors.items}</p>
               )}
 
-              {form.items.map((item, idx) => (
-                <div key={idx} className="card p-4 space-y-3 relative">
-                  {/* Item number + remove */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-stone-500">Item {idx + 1}</span>
-                    {form.items.length > 1 && (
-                      <button type="button" onClick={() => removeItem(idx)}
-                        className="text-stone-300 hover:text-red-500 transition-colors p-1">
-                        <TrashIcon />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Catalog picker */}
-                  {catalog.length > 0 && (
-                    <div>
-                      <label className="label">Quick fill from catalog</label>
-                      <select className="input select text-sm"
-                        value=""
-                        onChange={e => autofillFromCatalog(idx, e.target.value)}>
-                        <option value="">— Pick from catalog —</option>
-                        {categories.map(cat => (
-                          <optgroup key={cat} label={cat}>
-                            {catalog.filter(c => c.category === cat).map(c => (
-                              <option key={c.id} value={c.id}>
-                                {c.name} ({c.unit}){c.defaultPrice ? ` — ₹${c.defaultPrice}` : ''}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                    </div>
+              {/* Catalog search */}
+              {catalog.length > 0 && (
+                <div className="flex items-center justify-between gap-3">
+                  <input className="input text-sm flex-1" value={catalogSearch}
+                    onChange={e => setCatalogSearch(e.target.value)}
+                    placeholder="Search catalog…" />
+                  {selectedCount > 0 && (
+                    <span className="text-[11px] font-medium text-stone-500 whitespace-nowrap">
+                      {selectedCount} item{selectedCount !== 1 ? 's' : ''} selected
+                    </span>
                   )}
+                </div>
+              )}
 
-                  {/* Item name + category */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="label">Item Name *</label>
-                      <input className="input text-sm" value={item.itemName}
-                        onChange={e => setItem(idx, 'itemName', e.target.value)}
-                        placeholder="e.g. OPC Cement 53 Grade" />
-                      <FieldError msg={errors[`item_${idx}_itemName`]} />
-                    </div>
-                    <div>
-                      <label className="label">Category *</label>
-                      <input className="input text-sm" value={item.itemCategory}
-                        onChange={e => setItem(idx, 'itemCategory', e.target.value)}
-                        placeholder="e.g. Cement"
-                        list={`cat-list-${idx}`} />
-                      <datalist id={`cat-list-${idx}`}>
-                        {categories.map(c => <option key={c} value={c} />)}
-                      </datalist>
-                      <FieldError msg={errors[`item_${idx}_itemCategory`]} />
-                    </div>
+              {/* Catalog list, grouped by category, each with a checkbox */}
+              {categories.filter(cat => filteredCatalog.some(c => c.category === cat)).map(cat => (
+                <div key={cat} className="space-y-1.5">
+                  <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide px-1">{cat}</p>
+                  <div className="card divide-y divide-stone-50 overflow-hidden">
+                    {filteredCatalog.filter(c => c.category === cat).map(item => {
+                      const sel = form.selectedItems[item.id];
+                      const checked = !!sel;
+                      return (
+                        <div key={item.id} className="px-3 py-2.5">
+                          <label className="flex items-start gap-3 cursor-pointer">
+                            <span className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${
+                              checked ? 'bg-stone-800 border-stone-800 text-white' : 'border-stone-300 text-transparent'
+                            }`}>
+                              <CheckIcon />
+                            </span>
+                            <input type="checkbox" className="hidden" checked={checked}
+                              onChange={() => toggleCatalogItem(item)} />
+                            <span className="flex-1 min-w-0">
+                              <span className="flex items-center justify-between gap-3">
+                                <span className="text-xs font-medium text-stone-800">{item.name}</span>
+                                <span className="text-[11px] text-stone-400 whitespace-nowrap">
+                                  {item.unit}{item.defaultPrice ? ` · ₹${item.defaultPrice}` : ''}
+                                </span>
+                              </span>
+                            </span>
+                          </label>
+
+                          {/* Expanded controls once checked */}
+                          {checked && (
+                            <div className="mt-2.5 ml-7 grid grid-cols-3 gap-2.5">
+                              <div>
+                                <label className="label">Quantity *</label>
+                                <input type="number" min="0.01" step="0.01" className="input text-sm"
+                                  value={sel.quantity}
+                                  onChange={e => setSelectedItemField(item.id, 'quantity', e.target.value)}
+                                  placeholder={`Qty in ${sel.unit}`} />
+                                <FieldError msg={errors[`sel_${item.id}_quantity`]} />
+                              </div>
+                              <div>
+                                <label className="label">Unit Price ₹</label>
+                                <input type="number" min="0" step="0.01" className="input text-sm"
+                                  value={sel.unitPrice}
+                                  onChange={e => setSelectedItemField(item.id, 'unitPrice', e.target.value)}
+                                  placeholder="380" />
+                              </div>
+                              <div>
+                                <label className="label">Brand</label>
+                                <input className="input text-sm" value={sel.brand}
+                                  onChange={e => setSelectedItemField(item.id, 'brand', e.target.value)}
+                                  placeholder="e.g. UltraTech" />
+                              </div>
+                              {sel.unitPrice && sel.quantity && (
+                                <div className="col-span-3 flex justify-end">
+                                  <span className="text-xs font-mono font-medium text-stone-700 bg-stone-50 px-2.5 py-1 rounded-lg">
+                                    ₹{(parseFloat(sel.unitPrice) * parseFloat(sel.quantity)).toLocaleString()}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-
-                  {/* Quantity + unit + unit price */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="label">Quantity *</label>
-                      <input type="number" min="0.01" step="0.01" className="input text-sm"
-                        value={item.quantity}
-                        onChange={e => setItem(idx, 'quantity', e.target.value)}
-                        placeholder="100" />
-                      <FieldError msg={errors[`item_${idx}_quantity`]} />
-                    </div>
-                    <div>
-                      <label className="label">Unit *</label>
-                      <select className="input select text-sm" value={item.unit}
-                        onChange={e => setItem(idx, 'unit', e.target.value)}>
-                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                      </select>
-                      <FieldError msg={errors[`item_${idx}_unit`]} />
-                    </div>
-                    <div>
-                      <label className="label">Unit Price ₹</label>
-                      <input type="number" min="0" step="0.01" className="input text-sm"
-                        value={item.unitPrice}
-                        onChange={e => setItem(idx, 'unitPrice', e.target.value)}
-                        placeholder="380" />
-                    </div>
-                  </div>
-
-                  {/* Brand + notes */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="label">Brand</label>
-                      <input className="input text-sm" value={item.brand}
-                        onChange={e => setItem(idx, 'brand', e.target.value)}
-                        placeholder="e.g. UltraTech" />
-                    </div>
-                    <div>
-                      <label className="label">Item Notes</label>
-                      <input className="input text-sm" value={item.notes}
-                        onChange={e => setItem(idx, 'notes', e.target.value)}
-                        placeholder="Any specific requirement" />
-                    </div>
-                  </div>
-
-                  {/* Item total */}
-                  {item.unitPrice && item.quantity && (
-                    <div className="flex justify-end">
-                      <span className="text-xs font-mono font-medium text-stone-700 bg-stone-50 px-2.5 py-1 rounded-lg">
-                        ₹{(parseFloat(item.unitPrice) * parseFloat(item.quantity)).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
                 </div>
               ))}
 
-              {/* Add item */}
-              <button type="button" onClick={addItem}
-                className="w-full py-2.5 border border-dashed border-stone-200 rounded-xl
-                           text-xs font-medium text-stone-400 hover:text-stone-600
-                           hover:border-stone-300 hover:bg-stone-50 transition-all
-                           flex items-center justify-center gap-2">
-                <PlusIcon /> Add another item
-              </button>
+              {catalog.length > 0 && filteredCatalog.length === 0 && (
+                <p className="text-xs text-stone-400 text-center py-3">No catalog items match "{catalogSearch}"</p>
+              )}
+
+              {/* Custom items not in the catalog */}
+              <div className="space-y-3 pt-1">
+                <p className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide px-1">
+                  Not in the catalog?
+                </p>
+
+                {form.customItems.map((item, idx) => (
+                  <div key={idx} className="card p-4 space-y-3 relative">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-stone-500">Custom item {idx + 1}</span>
+                      <button type="button" onClick={() => removeCustomItem(idx)}
+                        className="text-stone-300 hover:text-red-500 transition-colors p-1">
+                        <TrashIcon />
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">Item Name *</label>
+                        <input className="input text-sm" value={item.itemName}
+                          onChange={e => setCustomItem(idx, 'itemName', e.target.value)}
+                          placeholder="e.g. OPC Cement 53 Grade" />
+                        <FieldError msg={errors[`custom_${idx}_itemName`]} />
+                      </div>
+                      <div>
+                        <label className="label">Category *</label>
+                        <input className="input text-sm" value={item.itemCategory}
+                          onChange={e => setCustomItem(idx, 'itemCategory', e.target.value)}
+                          placeholder="e.g. Cement"
+                          list={`custom-cat-list-${idx}`} />
+                        <datalist id={`custom-cat-list-${idx}`}>
+                          {categories.map(c => <option key={c} value={c} />)}
+                        </datalist>
+                        <FieldError msg={errors[`custom_${idx}_itemCategory`]} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="label">Quantity *</label>
+                        <input type="number" min="0.01" step="0.01" className="input text-sm"
+                          value={item.quantity}
+                          onChange={e => setCustomItem(idx, 'quantity', e.target.value)}
+                          placeholder="100" />
+                        <FieldError msg={errors[`custom_${idx}_quantity`]} />
+                      </div>
+                      <div>
+                        <label className="label">Unit *</label>
+                        <select className="input select text-sm" value={item.unit}
+                          onChange={e => setCustomItem(idx, 'unit', e.target.value)}>
+                          {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                        <FieldError msg={errors[`custom_${idx}_unit`]} />
+                      </div>
+                      <div>
+                        <label className="label">Unit Price ₹</label>
+                        <input type="number" min="0" step="0.01" className="input text-sm"
+                          value={item.unitPrice}
+                          onChange={e => setCustomItem(idx, 'unitPrice', e.target.value)}
+                          placeholder="380" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="label">Brand</label>
+                        <input className="input text-sm" value={item.brand}
+                          onChange={e => setCustomItem(idx, 'brand', e.target.value)}
+                          placeholder="e.g. UltraTech" />
+                      </div>
+                      <div>
+                        <label className="label">Item Notes</label>
+                        <input className="input text-sm" value={item.notes}
+                          onChange={e => setCustomItem(idx, 'notes', e.target.value)}
+                          placeholder="Any specific requirement" />
+                      </div>
+                    </div>
+
+                    {item.unitPrice && item.quantity && (
+                      <div className="flex justify-end">
+                        <span className="text-xs font-mono font-medium text-stone-700 bg-stone-50 px-2.5 py-1 rounded-lg">
+                          ₹{(parseFloat(item.unitPrice) * parseFloat(item.quantity)).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <button type="button" onClick={addCustomItem}
+                  className="w-full py-2.5 border border-dashed border-stone-200 rounded-xl
+                             text-xs font-medium text-stone-400 hover:text-stone-600
+                             hover:border-stone-300 hover:bg-stone-50 transition-all
+                             flex items-center justify-center gap-2">
+                  <PlusIcon /> Add a custom item
+                </button>
+              </div>
 
               {/* Running total */}
               {estimatedTotal > 0 && (
@@ -431,7 +548,7 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
 
               {/* Items review table */}
               <div className="card overflow-hidden">
-                <p className="section-title px-4 pt-3">Items ({form.items.length})</p>
+                <p className="section-title px-4 pt-3">Items ({allItems.length})</p>
                 <table className="w-full">
                   <thead>
                     <tr className="bg-stone-25 border-b border-stone-100">
@@ -442,7 +559,7 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {form.items.map((item, i) => {
+                    {allItems.map((item, i) => {
                       const lineTotal = parseFloat(item.unitPrice || 0) * parseFloat(item.quantity || 0);
                       return (
                         <tr key={i} className="border-b border-stone-50 last:border-0">
