@@ -5,10 +5,11 @@ import Spinner from '../ui/Spinner';
 import { projectsAPI, materialsAPI } from '../../lib/api';
 
 const URGENCY_OPTIONS = [
-  { value: 'NORMAL',   label: 'Normal',   desc: 'Standard timeline' },
-  { value: 'URGENT',   label: 'Urgent',   desc: 'Needed within 48h' },
+  { value: 'NORMAL', label: 'Normal', desc: 'Standard timeline' },
+  { value: 'URGENT', label: 'Urgent', desc: 'Needed within 48h' },
   { value: 'CRITICAL', label: 'Critical', desc: 'Site blocked' },
 ];
+
 
 const UNITS = ['Bag (50kg)', 'Kg', 'Ton', 'CFT', 'CUM', 'Piece', 'Meter', 'Sqft', 'Litre', 'Nos'];
 
@@ -25,7 +26,7 @@ function FieldError({ msg }) {
 function TrashIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-      <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9h8l1-9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 9h8l1-9" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -33,7 +34,7 @@ function TrashIcon() {
 function PlusIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-      <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M6.5 1v11M1 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -41,24 +42,24 @@ function PlusIcon() {
 function CheckIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-      <path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M2 6.5l2.5 2.5L10 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
 
 export default function POCreateModal({ open, onSubmit, onClose }) {
-  const [step, setStep]         = useState(1);  // 1=details, 2=items, 3=review
-  const [projects,   setProjects]   = useState([]);
+  const [step, setStep] = useState(1);  // 1=details, 2=items, 3=review
+  const [projects, setProjects] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [catalog,    setCatalog]    = useState([]);
+  const [catalog, setCatalog] = useState([]);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [errors,     setErrors]     = useState({});
+  const [errors, setErrors] = useState({});
 
   const [form, setForm] = useState({
     projectId: '',
-    urgency:   'NORMAL',
-    notes:     '',
+    urgency: 'NORMAL',
+    notes: '',
     // catalogId -> { catalogId, itemName, itemCategory, unit, unitPrice, brand, quantity, notes }
     selectedItems: {},
     // manual items for anything not in the catalog
@@ -68,9 +69,9 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
   // Load dropdowns once
   useEffect(() => {
     if (!open) return;
-    projectsAPI.getAll({ limit: 100 }).then(({ data }) => setProjects(data.projects)).catch(() => {});
-    materialsAPI.getCategories().then(({ data }) => setCategories(data.categories)).catch(() => {});
-    materialsAPI.getCatalog().then(({ data }) => setCatalog(data.items)).catch(() => {});
+    projectsAPI.getAll({ limit: 100 }).then(({ data }) => setProjects(data.projects)).catch(() => { });
+    materialsAPI.getCategories().then(({ data }) => setCategories(data.categories)).catch(() => { });
+    materialsAPI.getCatalog().then(({ data }) => setCatalog(data.items)).catch(() => { });
   }, [open]);
 
   // Reset on close
@@ -96,14 +97,14 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
         delete selectedItems[item.id];
       } else {
         selectedItems[item.id] = {
-          catalogId:    item.id,
-          itemName:     item.name,
+          catalogId: item.id,
+          itemName: item.name,
           itemCategory: item.category,
-          unit:         item.unit,
-          unitPrice:    item.defaultPrice ? String(item.defaultPrice) : '',
-          brand:        item.brands?.[0] || '',
-          quantity:     '',
-          notes:        '',
+          unit: item.unit,
+          unitPrice: item.defaultPrice ? String(item.defaultPrice) : '',
+          brand: item.brands?.[0] || '',
+          quantity: '',
+          notes: '',
         };
       }
       return { ...p, selectedItems };
@@ -167,10 +168,10 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
       }
     });
     form.customItems.forEach((item, idx) => {
-      if (!item.itemName.trim())     e[`custom_${idx}_itemName`]     = 'Required';
+      if (!item.itemName.trim()) e[`custom_${idx}_itemName`] = 'Required';
       if (!item.itemCategory.trim()) e[`custom_${idx}_itemCategory`] = 'Required';
       if (!item.quantity || Number(item.quantity) <= 0) e[`custom_${idx}_quantity`] = 'Enter a valid quantity';
-      if (!item.unit)                e[`custom_${idx}_unit`]         = 'Required';
+      if (!item.unit) e[`custom_${idx}_unit`] = 'Required';
     });
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -194,16 +195,16 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
     try {
       const payload = {
         projectId: form.projectId,
-        urgency:   form.urgency,
-        notes:     form.notes || undefined,
+        urgency: form.urgency,
+        notes: form.notes || undefined,
         items: allItems.map(item => ({
-          itemName:     item.itemName.trim(),
+          itemName: item.itemName.trim(),
           itemCategory: item.itemCategory.trim(),
-          quantity:     parseFloat(item.quantity),
-          unit:         item.unit,
-          unitPrice:    item.unitPrice ? parseFloat(item.unitPrice) : undefined,
-          brand:        item.brand?.trim() || undefined,
-          notes:        item.notes?.trim() || undefined,
+          quantity: parseFloat(item.quantity),
+          unit: item.unit,
+          unitPrice: item.unitPrice ? parseFloat(item.unitPrice) : undefined,
+          brand: item.brand?.trim() || undefined,
+          notes: item.notes?.trim() || undefined,
         })),
       };
       await onSubmit(payload);
@@ -218,12 +219,12 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
   // Estimated total from items with prices
   const estimatedTotal = allItems.reduce((sum, item) => {
     const price = parseFloat(item.unitPrice) || 0;
-    const qty   = parseFloat(item.quantity)  || 0;
+    const qty = parseFloat(item.quantity) || 0;
     return sum + price * qty;
   }, 0);
 
   const selectedProject = projects.find(p => p.id === form.projectId);
-  const selectedCount   = allItems.length;
+  const selectedCount = allItems.length;
 
   const filteredCatalog = catalog.filter(c =>
     !catalogSearch.trim() ||
@@ -240,16 +241,15 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
         <div className="flex items-center gap-0 px-5 pt-4 pb-3 border-b border-stone-100 flex-shrink-0">
           {STEP_LABELS.map((label, i) => {
             const s = i + 1;
-            const done    = step > s;
+            const done = step > s;
             const current = step === s;
             return (
               <div key={s} className="flex items-center">
                 <div className="flex items-center gap-1.5">
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold transition-all ${
-                    done    ? 'bg-green-500 text-white' :
-                    current ? 'bg-stone-800 text-white' :
-                              'bg-stone-100 text-stone-400'
-                  }`}>
+                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-semibold transition-all ${done ? 'bg-green-500 text-white' :
+                      current ? 'bg-stone-800 text-white' :
+                        'bg-stone-100 text-stone-400'
+                    }`}>
                     {done ? '✓' : s}
                   </div>
                   <span className={`text-xs font-medium ${current ? 'text-stone-800' : 'text-stone-400'}`}>
@@ -286,20 +286,18 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
                   {URGENCY_OPTIONS.map(u => (
                     <button key={u.value} type="button"
                       onClick={() => setField('urgency', u.value)}
-                      className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-left transition-all ${
-                        form.urgency === u.value
+                      className={`flex flex-col items-start px-3 py-2.5 rounded-xl border text-left transition-all ${form.urgency === u.value
                           ? u.value === 'CRITICAL' ? 'border-red-300 bg-red-50'
-                          : u.value === 'URGENT'   ? 'border-amber-300 bg-amber-50'
-                          :                          'border-stone-300 bg-stone-50'
+                            : u.value === 'URGENT' ? 'border-amber-300 bg-amber-50'
+                              : 'border-stone-300 bg-stone-50'
                           : 'border-stone-100 hover:border-stone-200'
-                      }`}>
-                      <span className={`text-xs font-semibold ${
-                        form.urgency === u.value
+                        }`}>
+                      <span className={`text-xs font-semibold ${form.urgency === u.value
                           ? u.value === 'CRITICAL' ? 'text-red-700'
-                          : u.value === 'URGENT'   ? 'text-amber-700'
-                          :                          'text-stone-700'
+                            : u.value === 'URGENT' ? 'text-amber-700'
+                              : 'text-stone-700'
                           : 'text-stone-600'
-                      }`}>{u.label}</span>
+                        }`}>{u.label}</span>
                       <span className="text-[10px] text-stone-400 mt-0.5">{u.desc}</span>
                     </button>
                   ))}
@@ -348,9 +346,8 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
                       return (
                         <div key={item.id} className="px-3 py-2.5">
                           <label className="flex items-start gap-3 cursor-pointer">
-                            <span className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${
-                              checked ? 'bg-stone-800 border-stone-800 text-white' : 'border-stone-300 text-transparent'
-                            }`}>
+                            <span className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border transition-colors ${checked ? 'bg-stone-800 border-stone-800 text-white' : 'border-stone-300 text-transparent'
+                              }`}>
                               <CheckIcon />
                             </span>
                             <input type="checkbox" className="hidden" checked={checked}
@@ -525,11 +522,10 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
               <div className="card p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="section-title mb-0">Purchase Order Summary</p>
-                  <span className={`badge text-xs ${
-                    form.urgency === 'CRITICAL' ? 'bg-red-50 text-red-700' :
-                    form.urgency === 'URGENT'   ? 'bg-amber-50 text-amber-700' :
-                                                   'bg-stone-100 text-stone-500'
-                  }`}>{form.urgency}</span>
+                  <span className={`badge text-xs ${form.urgency === 'CRITICAL' ? 'bg-red-50 text-red-700' :
+                      form.urgency === 'URGENT' ? 'bg-amber-50 text-amber-700' :
+                        'bg-stone-100 text-stone-500'
+                    }`}>{form.urgency}</span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -594,8 +590,8 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
               {/* What happens next info */}
               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex gap-3">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-blue-500 flex-shrink-0 mt-0.5">
-                  <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4"/>
-                  <path d="M8 7v4M8 5v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M8 7v4M8 5v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                 </svg>
                 <div className="space-y-0.5">
                   <p className="text-xs font-medium text-blue-800">What happens next?</p>
@@ -622,10 +618,9 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
           <div className="flex items-center gap-2">
             {/* Step dots */}
             <div className="flex gap-1 mr-3">
-              {[1,2,3].map(s => (
-                <div key={s} className={`w-1.5 h-1.5 rounded-full transition-all ${
-                  s === step ? 'bg-stone-800 w-3' : s < step ? 'bg-green-400' : 'bg-stone-200'
-                }`} />
+              {[1, 2, 3].map(s => (
+                <div key={s} className={`w-1.5 h-1.5 rounded-full transition-all ${s === step ? 'bg-stone-800 w-3' : s < step ? 'bg-green-400' : 'bg-stone-200'
+                  }`} />
               ))}
             </div>
 
@@ -637,7 +632,7 @@ export default function POCreateModal({ open, onSubmit, onClose }) {
               <button type="button" className="btn-amber px-4" disabled={submitting}
                 onClick={handleSubmit}>
                 {submitting
-                  ? <><Spinner size={13}/> Submitting…</>
+                  ? <><Spinner size={13} /> Submitting…</>
                   : 'Submit to Finance'
                 }
               </button>
