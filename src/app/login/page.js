@@ -84,14 +84,14 @@ export default function LoginPage() {
             Manage every<br/><em>site, team &</em><br/>material.
           </h2>
           <p className="text-stone-400 text-sm leading-relaxed">
-            Real-time attendance, purchase orders, task tracking, and labour management — all in one place.
+            Real-time attendance, purchase orders, task tracking, and sub-contractor management — all in one place.
           </p>
         </div>
         <div className="relative space-y-3">
           {[
             { icon: '◎', label: 'Geo-fenced punch in/out' },
             { icon: '◈', label: '8-stage PO lifecycle' },
-            { icon: '◐', label: 'Live labour wage reports' },
+            { icon: '◐', label: 'Live sub-contractor wage reports' },
           ].map(f => (
             <div key={f.label} className="flex items-center gap-3">
               <span className="text-amber-400 text-base">{f.icon}</span>

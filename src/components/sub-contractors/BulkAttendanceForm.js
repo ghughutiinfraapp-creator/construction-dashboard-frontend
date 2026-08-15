@@ -12,11 +12,11 @@ const STATUS_COLOURS = {
   HALF_DAY: 'border-amber-300 bg-amber-50 text-amber-700',
 };
 
-export default function BulkAttendanceForm({ labourers, projectId, onSubmit, onCancel }) {
+export default function BulkAttendanceForm({ subContractors, projectId, onSubmit, onCancel }) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const [date, setDate] = useState(today);
   const [records, setRecords] = useState(
-    labourers.map(l => ({ labourerId: l.id, status: 'PRESENT' }))
+    subContractors.map(l => ({ subContractorId: l.id, status: 'PRESENT' }))
   );
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,9 +25,9 @@ export default function BulkAttendanceForm({ labourers, projectId, onSubmit, onC
     setRecords(prev => prev.map(r => ({ ...r, status })));
   };
 
-  const setStatus = (labourerId, status) => {
+  const setStatus = (subContractorId, status) => {
     setRecords(prev => prev.map(r =>
-      r.labourerId === labourerId ? { ...r, status } : r
+      r.subContractorId === subContractorId ? { ...r, status } : r
     ));
   };
 
@@ -81,32 +81,32 @@ export default function BulkAttendanceForm({ labourers, projectId, onSubmit, onC
         </div>
       </div>
 
-      {/* Labourer list */}
+      {/* Sub-Contractor list */}
       <div className="overflow-y-auto flex-1 divide-y divide-stone-50">
-        {labourers.map((labourer, idx) => {
-          const record  = records.find(r => r.labourerId === labourer.id);
+        {subContractors.map((subContractor, idx) => {
+          const record  = records.find(r => r.subContractorId === subContractor.id);
           const current = record?.status || 'PRESENT';
           return (
-            <div key={labourer.id}
+            <div key={subContractor.id}
               className="flex items-center gap-3 px-4 py-2.5 hover:bg-stone-25">
               {/* Initials */}
               <div className="w-8 h-8 rounded-full bg-stone-100 flex items-center justify-center flex-shrink-0">
                 <span className="text-stone-500 text-[10px] font-semibold">
-                  {labourer.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
+                  {subContractor.name.split(' ').map(n => n[0]).join('').slice(0,2).toUpperCase()}
                 </span>
               </div>
 
               {/* Name + trade */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-stone-800 truncate">{labourer.name}</p>
-                <p className="text-[11px] text-stone-400">{labourer.tradeType} · ₹{Number(labourer.dailyWage).toLocaleString()}/day</p>
+                <p className="text-sm font-medium text-stone-800 truncate">{subContractor.name}</p>
+                <p className="text-[11px] text-stone-400">{subContractor.tradeType} · Proposed: ₹{Number(subContractor.proposedAmount || 0).toLocaleString()}</p>
               </div>
 
               {/* Status selector */}
               <div className="flex gap-1 flex-shrink-0">
                 {STATUS_OPTIONS.map(s => (
                   <button key={s} type="button"
-                    onClick={() => setStatus(labourer.id, s)}
+                    onClick={() => setStatus(subContractor.id, s)}
                     className={`text-[10px] px-2 py-1 rounded-md border font-medium transition-all ${
                       current === s
                         ? STATUS_COLOURS[s]
@@ -120,9 +120,9 @@ export default function BulkAttendanceForm({ labourers, projectId, onSubmit, onC
           );
         })}
 
-        {labourers.length === 0 && (
+        {subContractors.length === 0 && (
           <div className="flex items-center justify-center py-12">
-            <p className="text-xs text-stone-400">No labourers in selected project</p>
+            <p className="text-xs text-stone-400">No sub-contractors in selected project</p>
           </div>
         )}
       </div>
@@ -130,11 +130,11 @@ export default function BulkAttendanceForm({ labourers, projectId, onSubmit, onC
       {/* Footer */}
       <div className="flex justify-between items-center px-4 py-3 border-t border-stone-100 flex-shrink-0">
         <span className="text-xs text-stone-400">
-          {labourers.length} labourer{labourers.length !== 1 ? 's' : ''}
+          {subContractors.length} sub-contractor{subContractors.length !== 1 ? 's' : ''}
         </span>
         <div className="flex gap-2">
           <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
-          <button type="submit" className="btn-primary" disabled={submitting || labourers.length === 0}>
+          <button type="submit" className="btn-primary" disabled={submitting || subContractors.length === 0}>
             {submitting ? <><Spinner size={13}/> Saving…</> : 'Save Attendance'}
           </button>
         </div>

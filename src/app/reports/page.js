@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import { dashboardAPI, attendanceAPI, labourAPI, purchaseOrdersAPI, projectsAPI } from '../../lib/api';
+import { dashboardAPI, attendanceAPI, subContractorsAPI, purchaseOrdersAPI, projectsAPI } from '../../lib/api';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie
 } from 'recharts';
@@ -456,10 +456,10 @@ function WageReport() {
     try {
       const params = { startDate: f.startDate, endDate: f.endDate };
       if (f.projectId) params.projectId = f.projectId;
-      const { data } = await labourAPI.getWageReport(params);
+      const { data } = await subContractorsAPI.getWageReport(params);
       const list = Array.isArray(data?.report) ? data.report : [];
       setReport(list);
-      setTotal(Number(data?.totalLabourCost || 0));
+      setTotal(list.reduce((sum, r) => sum + Number(r.amountPaid || 0), 0));
     } catch (err) {
       console.error('Wage Report Error:', err);
       const msg = err.response?.data?.message || err.friendlyMessage || err.message || 'Failed to generate wage report';
@@ -504,7 +504,7 @@ function WageReport() {
     const acc = report.reduce((map, item) => {
       const trade = item?.tradeType || 'General';
       if (!map[trade]) map[trade] = { trade, totalCost: 0, count: 0 };
-      map[trade].totalCost += Number(item?.totalWage || 0);
+      map[trade].totalCost += Number(item?.amountPaid || 0);
       map[trade].count += 1;
       return map;
     }, {});
@@ -513,16 +513,17 @@ function WageReport() {
 
   const handleExport = () => {
     if (!filteredReport.length) return toast.error('No wage data to export');
-    const headers = ['Labourer Name', 'Trade', 'Daily Wage', 'Days Present', 'Half Days', 'Total Wage'];
+    const headers = ['Sub-Contractor Name', 'Trade', 'Contract Amount', 'Amount Paid', 'Pending Amount', 'Days Present', 'Half Days'];
     const rows = filteredReport.map(r => [
       r?.name || '—',
       r?.tradeType || '—',
-      r?.dailyWage || 0,
+      r?.proposedAmount || 0,
+      r?.amountPaid || 0,
+      r?.pendingAmount || 0,
       r?.daysPresent || 0,
       r?.halfDays || 0,
-      r?.totalWage || 0,
     ]);
-    exportToCSV(`Wage_Report_${filters.startDate}_to_${filters.endDate}`, headers, rows);
+    exportToCSV(`SubContractor_Wage_Report_${filters.startDate}_to_${filters.endDate}`, headers, rows);
   };
 
   return (
@@ -613,23 +614,23 @@ function WageReport() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <StatBox
-              label="Active Labour Workers"
+              label="Active Sub-Contractors"
               value={report.length}
-              sub="Workers in calculated period"
+              sub="Sub-contractors in calculated period"
               icon={HardHat}
               color="amber"
             />
             <StatBox
-              label="Total Labour Expense"
+              label="Total Amount Paid"
               value={fmt(total)}
-              sub="Cumulative wage liability"
+              sub="Cumulative paid amount"
               icon={IndianRupee}
               color="emerald"
             />
             <StatBox
-              label="Avg Earnings / Worker"
+              label="Avg Paid / Sub-Contractor"
               value={report.length ? fmt(total / report.length) : '—'}
-              sub="Mean payout per worker"
+              sub="Mean payout per sub-contractor"
               icon={TrendingUp}
               color="purple"
             />
@@ -653,15 +654,15 @@ function WageReport() {
           <div className="card p-4 space-y-3 overflow-hidden">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-stone-800 text-sm">Worker Payroll Breakdown</h3>
-                <p className="text-xs text-stone-400">Showing {filteredReport.length} workers</p>
+                <h3 className="font-semibold text-stone-800 text-sm">Sub-Contractor Payroll Breakdown</h3>
+                <p className="text-xs text-stone-400">Showing {filteredReport.length} sub-contractors</p>
               </div>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 sm:w-64">
                   <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-stone-400" />
                   <input
                     type="text"
-                    placeholder="Search worker or trade..."
+                    placeholder="Search sub-contractor or trade..."
                     className="input text-xs pl-8 py-1.5"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
@@ -681,12 +682,13 @@ function WageReport() {
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b border-stone-100 bg-stone-25">
-                    <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase">Worker</th>
+                    <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase">Sub-Contractor</th>
                     <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase">Trade</th>
-                    <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase">Daily Wage</th>
+                    <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase">Contract Amount</th>
+                    <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase">Amount Paid</th>
+                    <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase">Pending Amount</th>
                     <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase text-center">Days Present</th>
                     <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase text-center">Half Days</th>
-                    <th className="px-3 py-2.5 text-[10px] font-semibold text-stone-400 uppercase text-right">Total Payable</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-50 text-xs">
@@ -695,9 +697,9 @@ function WageReport() {
                       <td className="px-3 py-2.5 font-medium text-stone-800">
                         <div className="flex items-center gap-2">
                           <div className="w-6 h-6 rounded-full bg-stone-100 text-stone-700 flex items-center justify-center text-[10px] font-bold">
-                            {(r?.name || 'W').slice(0, 2).toUpperCase()}
+                            {(r?.name || 'S').slice(0, 2).toUpperCase()}
                           </div>
-                          <span>{r?.name || 'Worker'}</span>
+                          <span>{r?.name || 'Sub-Contractor'}</span>
                         </div>
                       </td>
                       <td className="px-3 py-2.5">
@@ -705,7 +707,9 @@ function WageReport() {
                           {r?.tradeType || 'General'}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 font-mono text-stone-600">{fmtFull(r?.dailyWage)}</td>
+                      <td className="px-3 py-2.5 font-mono text-stone-600">{fmtFull(r?.proposedAmount)}</td>
+                      <td className="px-3 py-2.5 font-mono text-green-700">{fmtFull(r?.amountPaid)}</td>
+                      <td className="px-3 py-2.5 font-mono text-amber-700">{fmtFull(r?.pendingAmount)}</td>
                       <td className="px-3 py-2.5 text-center">
                         <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
                           {r?.daysPresent || 0}
@@ -716,15 +720,12 @@ function WageReport() {
                           {r?.halfDays || 0}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono font-bold text-stone-900">
-                        {fmtFull(r?.totalWage)}
-                      </td>
                     </tr>
                   ))}
                   {filteredReport.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-stone-400">
-                        No matching workers found for this search filter
+                      <td colSpan={7} className="py-8 text-center text-stone-400">
+                        No matching sub-contractors found for this search filter
                       </td>
                     </tr>
                   )}
@@ -733,7 +734,7 @@ function WageReport() {
             </div>
 
             <div className="flex justify-between items-center px-4 py-3 bg-stone-50 rounded-lg border border-stone-100">
-              <span className="text-xs font-semibold text-stone-600">Total Calculated Labour Cost</span>
+              <span className="text-xs font-semibold text-stone-600">Total Paid to Sub-Contractors</span>
               <span className="text-lg font-bold text-stone-900 font-display">{fmtFull(total)}</span>
             </div>
           </div>

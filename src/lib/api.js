@@ -107,18 +107,55 @@ export const taskCategoriesAPI = {
   getAll: (params) => api.get('/task-categories', { params }),
 };
 
-// ─── LABOUR ──────────────────────────────────────────────────────────
+// ─── SUB-CONTRACTORS ───────────────────────────────────────────────────
+// Renamed from `labourAPI`. Base path moved from /api/labour/* to
+// /api/sub-contractors/*  — the old path now 404s on the backend.
+// Field rename inside payloads too: every `labourerId` is now
+// `subContractorId` (see markAttendance).
+//
+// NOTE: any code that previously imported `labourAPI` (e.g. a
+// `useLabour` hook) needs to be updated to import `subContractorsAPI`
+// and to use the method names below — see the follow-up notes shared
+// alongside this file.
+export const subContractorsAPI = {
+  getAll: (params) => api.get('/sub-contractors', { params }),
+  create: (data) => api.post('/sub-contractors', data),
+  update: (id, data) => api.put(`/sub-contractors/${id}`, data),
+  getAttendance: (params) => api.get('/sub-contractors/attendance', { params }),
+  markAttendance: (data) => api.post('/sub-contractors/attendance/mark', data),
+  getWageReport: (params) => api.get('/sub-contractors/wage-report', { params }),
+  getPayments: (id) => api.get(`/sub-contractors/${id}/payments`),
+  addPayment: (id, data) => api.post(`/sub-contractors/${id}/payments`, data),
+};
 
-export const labourAPI = {
-  getLabourers: (params) => api.get('/labour/labourers', { params }),
-  createLabourer: (data) => api.post('/labour/labourers', data),
-  updateLabourer: (id, data) => api.put(`/labour/labourers/${id}`, data),
-  getAttendance: (params) => api.get('/labour/attendance', { params }),
-  markAttendance: (data) => api.post('/labour/attendance/mark', data),
-  getWageReport: (params) => api.get('/labour/wage-report', { params }),
-  // NEW — payment ledger
-  getPayments: (id) => api.get(`/labour/labourers/${id}/payments`),
-  addPayment: (id, data) => api.post(`/labour/labourers/${id}/payments`, data),
+// ─── FOREMAN / SITE LABOUR ─────────────────────────────────────────────
+// Wraps routes/foreman.js. This is the roster + daily tick-mark + monthly
+// wage-report flow used on-site: a foreman adds workers to a site's
+// roster once, then submits daily PRESENT/HALF_DAY/ABSENT attendance for
+// the whole roster with one call, and anyone with access (foreman, PM,
+// super admin, finance) can pull a month-wise report per site.
+export const foremanAPI = {
+  // All sites a foreman can log labour against.
+  getSites: () => api.get('/foreman/sites'),
+
+  // Roster (added once per worker, reused every day via tick-mark).
+  getRoster: (siteId, params) => api.get(`/foreman/sites/${siteId}/roster`, { params }),
+  addRosterWorker: (siteId, data) => api.post(`/foreman/sites/${siteId}/roster`, data),
+  updateRosterWorker: (workerId, data) => api.put(`/foreman/roster/${workerId}`, data),
+
+  // Daily entries.
+  getDailyEntries: (siteId, params) => api.get(`/foreman/sites/${siteId}/labour`, { params }),
+  submitDailyEntry: (siteId, data) => api.post(`/foreman/sites/${siteId}/labour`, data),
+  removeWorkerFromEntry: (entryId, workerEntryId) =>
+    api.delete(`/foreman/labour/${entryId}/workers/${workerEntryId}`),
+  deleteDailyEntry: (entryId) => api.delete(`/foreman/labour/${entryId}`),
+
+  // Aggregate + monthly report.
+  getSummary: (siteId) => api.get(`/foreman/sites/${siteId}/labour/summary`),
+  // month must be 'YYYY-MM'. Returns { site, month, days, report, totalWorkers, totalMonthlyWage }
+  // — exactly the shape WageReportTable expects.
+  getMonthlyReport: (siteId, month) =>
+    api.get(`/foreman/sites/${siteId}/labour/monthly-report`, { params: { month } }),
 };
 
 // ─── PURCHASE ORDERS ─────────────────────────────────────────────────

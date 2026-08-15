@@ -6,7 +6,7 @@ import ProjectForm from '../../../components/projects/ProjectForm';
 import PaymentScheduleManager from '../../../components/projects/PaymentScheduleManager';
 import Modal from '../../../components/ui/Modal';
 import Badge from '../../../components/ui/Badge';
-import { projectsAPI, dashboardAPI, tasksAPI, labourAPI } from '../../../lib/api';
+import { projectsAPI, dashboardAPI, tasksAPI, subContractorsAPI } from '../../../lib/api';
 import { useAuth } from '../../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
@@ -49,9 +49,9 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState(null);
   const [summary, setSummary] = useState(null);
   const [tasks, setTasks] = useState([]);
-  const [labourCost, setLabourCost] = useState(0);       // lifetime total paid on this project
-  const [labourCount, setLabourCount] = useState(0);      // number of labourers on this project
-  const [todayLabourCost, setTodayLabourCost] = useState(0); // amount earned today specifically
+  const [subContractorCost, setSubContractorCost] = useState(0);       // lifetime total paid on this project
+  const [subContractorCount, setSubContractorCount] = useState(0);      // number of sub-contractors on this project
+  const [todaySubContractorCost, setTodaySubContractorCost] = useState(0); // amount earned today specifically
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
   const [geoOpen, setGeoOpen] = useState(false);
@@ -73,28 +73,27 @@ export default function ProjectDetailPage() {
         projectsAPI.getById(id),
         dashboardAPI.getProjectSummary(id),
         tasksAPI.getAll({ projectId: id, limit: 10 }),
-        labourAPI.getLabourers({ projectId: id }),
-        labourAPI.getAttendance({ projectId: id, date: todayStr }),
+        subContractorsAPI.getAll({ projectId: id }),
+        subContractorsAPI.getAttendance({ projectId: id, date: todayStr }),
       ]);
       setProject(pd.project);
       setSummary(sd);
       setTasks(td.tasks);
 
-      // Lifetime labour cost + headcount for this project (amountPaid is
-      // computed server-side from attendance, so this is always accurate)
-      const projectLabourers = ld.labourers || [];
-      setLabourCost(projectLabourers.reduce((sum, l) => sum + Number(l.amountPaid || 0), 0));
-      setLabourCount(projectLabourers.length);
+      // Lifetime sub-contractor cost + headcount for this project
+      const projectSubContractors = ld.subContractors || [];
+      setSubContractorCost(sd.totalSubContractorCost ?? projectSubContractors.reduce((sum, l) => sum + Number(l.amountPaid || 0), 0));
+      setSubContractorCount(projectSubContractors.length);
 
-      // Amount actually earned by labour today specifically
+      // Amount actually earned by sub-contractors today specifically
       const todayRecords = tad.attendance || [];
       const todayCost = todayRecords.reduce((sum, r) => {
-        const dailyWage = Number(r.labourer?.proposedAmount || 0);
+        const dailyWage = Number(r.subContractor?.proposedAmount || 0);
         if (r.status === 'PRESENT') return sum + dailyWage;
         if (r.status === 'HALF_DAY') return sum + dailyWage / 2;
         return sum;
       }, 0);
-      setTodayLabourCost(todayCost);
+      setTodaySubContractorCost(todayCost);
 
       setGeoForm({
         geofenceLat: pd.project.geofenceLat ? String(pd.project.geofenceLat) : '',
@@ -157,19 +156,22 @@ export default function ProjectDetailPage() {
   const poCount = summary?.purchaseOrderCount ?? '—';
 
   // KPI strip: Budget shown only to SUPER_ADMIN/FINANCE; PM sees PO Count instead.
-  // "Today's Labour" now shows amount spent today (not headcount) —
-  // Labour Cost shows the running lifetime total for this project.
+  // KPI strip: Budget shown only to SUPER_ADMIN/FINANCE; PM sees PO Count instead.
+  // "Today's Sub-Contractor" now shows amount spent today —
+  // Sub-Contractor Cost shows the running lifetime total for this project.
   const kpiCards = canSeeBudget
     ? [
-        { label: 'Estimated Budget',            value: fmt(project.budget)   },
-        { label: 'PO Spend',          value: fmt(summary?.totalPOSpend) },
-        { label: "Cost Spent on Labour",    value: fmt(labourCost)  }, // now lifetime, not just today
-        { label: 'Task Progress',     value: `${taskPct}%`         },
+        { label: 'Estimated Budget',    value: fmt(project.budget)   },
+        { label: 'PO Spend',            value: fmt(summary?.totalPOSpend) },
+        { label: "Sub-Contractor Cost", value: fmt(summary?.totalSubContractorCost ?? subContractorCost)  },
+        { label: "Daily Labour Cost",   value: fmt(summary?.totalDailyLabourCost) },
+        { label: "Total Site Cost",     value: fmt(summary?.totalSiteCost) },
+        { label: 'Task Progress',       value: `${taskPct}%`         },
       ]
     : [
-        { label: 'Purchase Orders',   value: poCount                },
-        { label:  "Cost Spent on Labour",value: fmt(labourCost)   }, // now lifetime, not just today
-        { label: 'Task Progress',     value: `${taskPct}%`          },
+        { label: 'Purchase Orders',     value: poCount                },
+        { label: "Sub-Contractor Cost", value: fmt(summary?.totalSubContractorCost ?? subContractorCost)   },
+        { label: 'Task Progress',       value: `${taskPct}%`          },
       ];
 
   return (
@@ -199,7 +201,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* KPI strip */}
-        <div className={`grid gap-3 ${canSeeBudget ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'}`}>
+        <div className={`grid gap-3 ${canSeeBudget ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6' : 'grid-cols-2 sm:grid-cols-3'}`}>
           {kpiCards.map(k => (
             <div key={k.label} className="card px-4 py-3">
               <p className="text-[10px] text-stone-400 uppercase tracking-wide mb-1">{k.label}</p>
@@ -239,14 +241,16 @@ export default function ProjectDetailPage() {
             <InfoRow label="Start Date"        value={project.startDate ? format(new Date(project.startDate), 'dd MMM yyyy') : null}/>
             <InfoRow label="End Date"          value={project.endDate   ? format(new Date(project.endDate),   'dd MMM yyyy') : null}/>
             <InfoRow label="Address"           value={project.address}/>
-            <InfoRow label="Labour Cost"       value={fmt(labourCost)}/>
-            <InfoRow label="Today's Labour"    value={fmt(todayLabourCost)}/>
-            <InfoRow label="Labourers"         value={labourCount ? String(labourCount) : null}/>
+            <InfoRow label="Sub-Contractor Cost" value={fmt(summary?.totalSubContractorCost ?? subContractorCost)}/>
+            <InfoRow label="Today's Sub-Contractor Cost" value={fmt(todaySubContractorCost)}/>
+            <InfoRow label="Sub-Contractors"   value={subContractorCount ? String(subContractorCount) : null}/>
             {/* Budget rows — only for admin/finance */}
             {canSeeBudget && (
               <>
                 <InfoRow label="Budget"        value={fmt(project.budget)}/>
                 <InfoRow label="PO Spend"      value={fmt(summary?.totalPOSpend)}/>
+                <InfoRow label="Daily Labour Cost" value={fmt(summary?.totalDailyLabourCost)}/>
+                <InfoRow label="Total Site Cost" value={fmt(summary?.totalSiteCost)}/>
               </>
             )}
             <InfoRow label="Geo-fence Lat"     value={project.geofenceLat?.toFixed(6)}/>

@@ -13,17 +13,15 @@ function modeLabel(mode) {
   }[mode] || (mode || '').replace('_', ' ');
 }
 
-export default function LabourPaymentHistory({ labourer, payments, loading }) {
-  // Default to [] so we never crash on `.length` before the fetch resolves —
-  // this is the fix for the null-vs-array issue in the pattern this mirrors.
+export default function SubContractorPaymentHistory({ subContractor, payments, loading }) {
   const list = payments ?? [];
-  const paidAmount = Number(labourer.amountPaid || 0);
-  const contractAmount = Number(labourer.proposedAmount || 0);
+  const paidAmount = Number(subContractor.amountPaid || 0);
+  const contractAmount = Number(subContractor.proposedAmount || 0);
   const remaining = Math.max(0, contractAmount - paidAmount);
 
   return (
     <div className="p-5">
-      {/* Summary strip — same idea as pay-meta in PaymentScheduleManager */}
+      {/* Summary strip */}
       <div className="flex items-center justify-between bg-stone-50 rounded-lg px-3 py-2.5 mb-4">
         <span className="text-xs font-medium text-stone-700">{fmt(contractAmount)} total</span>
         <span className="text-xs font-semibold text-green-700">
@@ -35,7 +33,7 @@ export default function LabourPaymentHistory({ labourer, payments, loading }) {
 
       {!loading && (
         list.length === 0 ? (
-          <p className="text-xs text-stone-400">No payments recorded against this labourer yet.</p>
+          <p className="text-xs text-stone-400">No payments recorded against this sub-contractor yet.</p>
         ) : (
           <div className="space-y-2.5">
             {list.map(p => (

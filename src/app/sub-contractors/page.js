@@ -1,22 +1,27 @@
 'use client';
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
-import LabourerForm from '../../components/labour/LabourerForm';
-import BulkAttendanceForm from '../../components/labour/BulkAttendanceForm';
-import WageReportTable from '../../components/labour/WageReportTable';
-import LabourRecordPaymentForm from '../../components/labour/LabourRecordPaymentForm';
-import LabourPaymentHistory from '../../components/labour/LabourPaymentHistory';
+import SubContractorForm from '../../components/sub-contractors/SubContractorForm';
+import BulkAttendanceForm from '../../components/sub-contractors/BulkAttendanceForm';
+import WageReportTable from '../../components/sub-contractors/WageReportTable';
+import SubContractorRecordPaymentForm from '../../components/sub-contractors/SubContractorRecordPaymentForm';
+import SubContractorPaymentHistory from '../../components/sub-contractors/SubContractorPaymentHistory';
 import Modal from '../../components/ui/Modal';
 import EmptyState from '../../components/ui/EmptyState';
 import Badge from '../../components/ui/Badge';
-import { useLabour } from '../../hooks/useLabour';
-import { projectsAPI } from '../../lib/api';
+import { useSubContractors } from '../../hooks/useSubContractors';
+import { projectsAPI, foremanAPI } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { format, subDays } from 'date-fns';
 import toast from 'react-hot-toast';
 
 const TRADE_TYPES = ['Mason', 'Carpenter', 'Electrician', 'Plumber', 'Painter',
   'Welder', 'Steel Fixer', 'Helper', 'Supervisor', 'Other'];
+
+function currentMonthValue() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
 
 function PlusIcon() {
   return <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -86,57 +91,54 @@ function RowActionButton({ icon, label, onClick, tone = 'stone' }) {
   );
 }
 
-export default function LabourPage() {
+export default function SubContractorsPage() {
   const { user } = useAuth();
   const {
-    labourers, wageReport, totalWageCost,
-    loading, wageLoading,
+    subContractors,
+    loading,
     labFiltersRef,
-    loadLabourers, addLabourer, updateLabourer,
-    markAttendance, loadWageReport,
+    loadSubContractors, addSubContractor, updateSubContractor,
+    markAttendance,
     payments, paymentsLoading, loadPayments, recordPayment,
-  } = useLabour();
+  } = useSubContractors();
 
-  const [tab, setTab] = useState('labourers'); // 'labourers' | 'wages'
+  const [tab, setTab] = useState('subContractors'); // 'subContractors' | 'wages'
   const [projects, setProjects] = useState([]);
   const [search, setSearch] = useState('');
 
   // Filters
   const [filters, setFilters] = useState({ projectId: '', tradeType: '' });
 
-  // Wage report filters
-  const [wageFilters, setWageFilters] = useState({
-    projectId: '',
-    startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
-    endDate: format(new Date(), 'yyyy-MM-dd'),
-  });
+  // Labour wage report (site + month, day-wise present/absent) filters
+  const [wageSiteId, setWageSiteId] = useState('');
+  const [wageMonth, setWageMonth] = useState(currentMonthValue());
+  const [labourReport, setLabourReport] = useState(null);
+  const [labourReportLoading, setLabourReportLoading] = useState(false);
+  const [labourReportError, setLabourReportError] = useState('');
 
   // Modals
   const [addOpen, setAddOpen] = useState(false);
   const [attendOpen, setAttendOpen] = useState(false);
   const [attendProject, setAttendProject] = useState('');
 
-  // Payments — two separate modals, matching the record-vs-history split
-  // used for project payment schedules. Neither supports editing/deleting
-  // a past entry; you can only add a new one and view what's there.
-  const [recordPaymentFor, setRecordPaymentFor] = useState(null); // labourer object
-  const [historyFor, setHistoryFor] = useState(null);             // labourer object
+  const [recordPaymentFor, setRecordPaymentFor] = useState(null); // subcontractor object
+  const [historyFor, setHistoryFor] = useState(null);             // subcontractor object
 
-  // Inline edit state for Contract Amount (Amount Paid is no longer editable here —
-  // it's a running total maintained server-side from payment records)
+  // Inline edit state for Contract Amount
   const [editingId, setEditingId] = useState(null);
   const [editValues, setEditValues] = useState({ proposedAmount: '' });
   const [saving, setSaving] = useState(false);
 
-  const canManage = user && ['SITE_ENGINEER', 'PROJECT_MANAGER', 'SUPER_ADMIN'].includes(user.role);
-  // Recording a payment is restricted server-side to these roles. Viewing
-  // history stays open to everyone (GET .../payments has no role check).
+  const canManage = user && ['SITE_ENGINEER', 'PROJECT_MANAGER', 'SUPER_ADMIN', 'FOREMAN'].includes(user.role);
   const canRecordPayment = user && ['SUPER_ADMIN', 'FOREMAN'].includes(user.role);
 
   useEffect(() => {
     projectsAPI.getAll({ limit: 100 })
-      .then(({ data }) => setProjects(data.projects)).catch(() => { });
-    loadLabourers();
+      .then(({ data }) => {
+        setProjects(data.projects);
+        if (data.projects?.length) setWageSiteId((prev) => prev || data.projects[0].id);
+      }).catch(() => { });
+    loadSubContractors();
   }, []);
 
   // Debounced search
@@ -144,22 +146,45 @@ export default function LabourPage() {
     const t = setTimeout(() => {
       const f = { ...filters, search };
       labFiltersRef.current = f;
-      loadLabourers(f);
+      loadSubContractors(f);
     }, 350);
     return () => clearTimeout(t);
   }, [search]);
 
+  // Load the labour monthly wage report whenever site or month changes
+  // (and whenever the Wage Report tab is opened).
+  useEffect(() => {
+    if (tab !== 'wages' || !wageSiteId || !wageMonth) return;
+    let cancelled = false;
+    setLabourReportLoading(true);
+    setLabourReportError('');
+    foremanAPI.getMonthlyReport(wageSiteId, wageMonth)
+      .then(({ data }) => {
+        if (!cancelled) setLabourReport(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setLabourReportError(err?.response?.data?.message || err.friendlyMessage || 'Failed to load wage report');
+          setLabourReport(null);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLabourReportLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [tab, wageSiteId, wageMonth]);
+
   const applyFilters = (f) => {
     labFiltersRef.current = f;
-    loadLabourers(f);
+    loadSubContractors(f);
   };
 
-  const handleAddLabourer = async (payload) => {
+  const handleAddSubContractor = async (payload) => {
     try {
-      await addLabourer(payload); // hook already toasts success
+      await addSubContractor(payload);
       setAddOpen(false);
     } catch (err) {
-      toast.error(err?.response?.data?.error || 'Failed to sub-contractor');
+      toast.error(err?.response?.data?.error || 'Failed to add sub-contractor');
       throw err;
     }
   };
@@ -168,20 +193,11 @@ export default function LabourPage() {
     try {
       await markAttendance(payload);
       setAttendOpen(false);
-      // Marking attendance changes amountPaid (computed on the backend) — refresh so the table/cards reflect it
-      loadLabourers(labFiltersRef.current);
+      loadSubContractors(labFiltersRef.current);
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to save attendance');
       throw err;
     }
-  };
-
-  const handleLoadWageReport = () => {
-    if (!wageFilters.startDate || !wageFilters.endDate) {
-      toast.error('Select a date range');
-      return;
-    }
-    loadWageReport(wageFilters);
   };
 
   // ── Inline edit: Contract Amount only ───────────────────────────────
@@ -205,7 +221,7 @@ export default function LabourPage() {
 
     setSaving(true);
     try {
-      await updateLabourer(id, { proposedAmount });
+      await updateSubContractor(id, { proposedAmount });
       cancelEdit();
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to update contract amount');
@@ -226,25 +242,25 @@ export default function LabourPage() {
     }
   };
 
-  // ── Payments: history (loaded fresh each time the modal opens) ──────
+  // ── Payments: history
   const openHistory = (l) => {
     setHistoryFor(l);
     loadPayments(l.id);
   };
 
-  // ── Payments: print history for the labourer currently open ─────────
-  const handlePrintLabourPayments = () => {
+  // ── Payments: print history
+  const handlePrintPayments = () => {
     if (!historyFor) return;
 
-    const labourer = historyFor;
+    const subContractor = historyFor;
     const printWindow = window.open('', '_blank', 'width=900,height=650');
     if (!printWindow) {
       toast.error('Please allow pop-ups to print payment history');
       return;
     }
 
-    const contractAmount = Number(labourer.proposedAmount || 0);
-    const amountPaid = Number(labourer.amountPaid || 0);
+    const contractAmount = Number(subContractor.proposedAmount || 0);
+    const amountPaid = Number(subContractor.amountPaid || 0);
     const balance = contractAmount - amountPaid;
 
     const rows = (payments || [])
@@ -265,7 +281,7 @@ export default function LabourPage() {
     printWindow.document.write(`
       <html>
         <head>
-          <title>Payment History - ${labourer.name}</title>
+          <title>Payment History - ${subContractor.name}</title>
           <style>
             * { box-sizing: border-box; }
             body {
@@ -328,23 +344,18 @@ export default function LabourPage() {
               font-size: 10px;
               color: #a8a29e;
             }
-            @media print {
-              @page { margin: 20mm; }
-              .no-print { display: none; }
-            }
           </style>
         </head>
         <body>
-          <h1>${labourer.name}</h1>
+          <h1>${subContractor.name}</h1>
           <div class="sub">
             Payment History Report &middot; Generated ${format(new Date(), 'MMM d, yyyy h:mm a')}
           </div>
 
           <div class="meta">
-            <div><span>Trade</span>${labourer.tradeType || '—'}</div>
-            <div><span>Project</span>${labourer.project?.name || '—'}</div>
-            <div><span>Phone</span>${labourer.phone || '—'}</div>
-            <div><span>Aadhaar</span>${labourer.aadhaar || '—'}</div>
+            <div><span>Project</span>${subContractor.project?.name || '—'}</div>
+            <div><span>Phone</span>${subContractor.phone || '—'}</div>
+            
           </div>
 
           <div class="section-title">Financial Summary</div>
@@ -381,7 +392,7 @@ export default function LabourPage() {
             </tfoot>
           </table>
 
-          <div class="footer-note">Generated from Labour Management System</div>
+          <div class="footer-note">Generated from Sub-Contractor Management System</div>
         </body>
       </html>
     `);
@@ -392,19 +403,17 @@ export default function LabourPage() {
     };
   };
 
-  // Labourers for the selected attendance project
-  const projectLabourers = attendProject
-    ? labourers.filter(l => l.project?.id === attendProject || l.projectId === attendProject)
-    : labourers;
+  const projectSubContractors = attendProject
+    ? subContractors.filter(l => l.project?.id === attendProject || l.projectId === attendProject)
+    : subContractors;
 
-  // Payroll summary across the currently filtered labourers
-  const totalDailyPayroll = labourers.reduce((sum, l) => sum + Number(l.proposedAmount || 0), 0);
-  const totalAmountPaid = labourers.reduce((sum, l) => sum + Number(l.amountPaid || 0), 0);
+  const totalContractPayroll = subContractors.reduce((sum, l) => sum + Number(l.proposedAmount || 0), 0);
+  const totalAmountPaid = subContractors.reduce((sum, l) => sum + Number(l.amountPaid || 0), 0);
 
   return (
     <DashboardLayout
-      title="Labour"
-      subtitle={`${labourers.length} active labourer${labourers.length !== 1 ? 's' : ''}`}
+      title="Sub-Contractors"
+      subtitle={`${subContractors.length} active sub-contractor${subContractors.length !== 1 ? 's' : ''}`}
       actions={
         <div className="flex gap-2">
           {canManage && (
@@ -413,13 +422,12 @@ export default function LabourPage() {
                 onClick={() => setAttendOpen(true)}>
                 Mark Attendance
               </button>
-              <button className="btn-primary text-xs px-3 py-1.5"
+              <button className="btn-primary text-xs px-3 py-1.5 animate-fade-in"
                 onClick={() => setAddOpen(true)}>
-                <div className='flex flex-col items-center gap-1'>
+                <div className='flex items-center gap-1.5'>
                  <PlusIcon />
-                 <p>Sub-Contractor</p>
+                 <span>Sub-Contractor</span>
                 </div>
-                
               </button>
             </>
           )}
@@ -431,7 +439,7 @@ export default function LabourPage() {
         {/* ── Tab switch ── */}
         <div className="flex bg-stone-100 rounded-xl p-1 w-fit gap-1">
           {[
-            { key: 'labourers', label: 'Labourers' },
+            { key: 'subContractors', label: 'Sub-Contractors' },
             { key: 'wages', label: 'Wage Report' },
           ].map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
@@ -444,15 +452,15 @@ export default function LabourPage() {
           ))}
         </div>
 
-        {/* ══ LABOURERS TAB ══ */}
-        {tab === 'labourers' && (
+        {/* ══ SUB-CONTRACTORS TAB ══ */}
+        {tab === 'subContractors' && (
           <>
             {/* Payroll summary strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="card px-4 py-3">
                 <p className="text-[10px] text-stone-400 uppercase tracking-wide mb-1">Total Contract Amount</p>
                 <p className="text-xl font-semibold text-stone-800 font-display">
-                  ₹{totalDailyPayroll.toLocaleString()}
+                  ₹{totalContractPayroll.toLocaleString()}
                 </p>
               </div>
               <div className="card px-4 py-3">
@@ -479,20 +487,12 @@ export default function LabourPage() {
                 <option value="">All projects</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              <select className="input select w-40 text-sm"
-                value={filters.tradeType}
-                onChange={e => {
-                  const f = { ...filters, tradeType: e.target.value };
-                  setFilters(f); applyFilters({ ...f, search });
-                }}>
-                <option value="">All trades</option>
-                {TRADE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+             
               {(filters.projectId || filters.tradeType || search) && (
                 <button className="text-xs text-stone-400 hover:text-stone-600 underline underline-offset-2"
                   onClick={() => {
                     setSearch(''); setFilters({ projectId: '', tradeType: '' });
-                    loadLabourers({ projectId: '', tradeType: '', search: '' });
+                    loadSubContractors({ projectId: '', tradeType: '', search: '' });
                   }}>
                   Clear
                 </button>
@@ -512,7 +512,7 @@ export default function LabourPage() {
                     </div>
                   ))}
                 </div>
-              ) : labourers.length === 0 ? (
+              ) : subContractors.length === 0 ? (
                 <EmptyState
                   icon={<svg width="44" height="44" viewBox="0 0 48 48" fill="none">
                     <circle cx="24" cy="16" r="8" stroke="currentColor" strokeWidth="2" />
@@ -520,10 +520,10 @@ export default function LabourPage() {
                     <circle cx="38" cy="14" r="6" fill="white" stroke="currentColor" strokeWidth="2" />
                     <path d="M38 11v3M38 17v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   </svg>}
-                  title="No labourers found"
+                  title="No sub-contractors found"
                   description={filters.projectId || filters.tradeType || search
                     ? 'Try adjusting your filters'
-                    : 'Add the first labourer to get started'}
+                    : 'Add the first sub-contractor to get started'}
                   action={canManage && !filters.projectId && !filters.tradeType && !search && (
                     <button className="btn-primary text-xs" onClick={() => setAddOpen(true)}>
                       Sub-Contractor
@@ -535,8 +535,7 @@ export default function LabourPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-stone-100 bg-stone-25">
-                        {['Name', 'Trade', 'Project', 'Contract Amount', 'Amount Paid', 'Phone', 'Aadhaar', 'Actions']
-                          .filter(Boolean)
+                        {['Name', 'Project', 'Contract Amount', 'Amount Paid', 'Phone',  'Actions']
                           .map(h => (
                             <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
                                                    text-stone-400 uppercase tracking-wide whitespace-nowrap">
@@ -546,7 +545,7 @@ export default function LabourPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {labourers.map(l => {
+                      {subContractors.map(l => {
                         const isEditing = editingId === l.id;
                         const dailyWage = Number(l.proposedAmount || 0);
                         const paid = Number(l.amountPaid || 0);
@@ -562,9 +561,7 @@ export default function LabourPage() {
                                 <span className="text-sm font-medium text-stone-800">{l.name}</span>
                               </div>
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="badge bg-stone-100 text-stone-600">{l.tradeType}</span>
-                            </td>
+                          
                             <td className="px-4 py-3">
                               <span className="text-xs text-stone-500 truncate block max-w-[140px]">
                                 {l.project?.name}
@@ -586,8 +583,6 @@ export default function LabourPage() {
                               )}
                             </td>
                             <td className="px-4 py-3">
-                              {/* Amount Paid is read-only — a running total maintained by the
-                                  backend from payment records. Use "Record Payment" to add to it. */}
                               <span className="text-xs font-mono font-medium text-green-700">
                                 ₹{paid.toLocaleString()}
                               </span>
@@ -597,11 +592,7 @@ export default function LabourPage() {
                                 {l.phone || '—'}
                               </span>
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="text-xs text-stone-500 font-mono">
-                                {l.aadhaar || '—'}
-                              </span>
-                            </td>
+                           
                             <td className="px-4 py-3">
                               {isEditing ? (
                                 <div className="flex gap-2">
@@ -656,62 +647,56 @@ export default function LabourPage() {
           </>
         )}
 
-        {/* ══ WAGE REPORT TAB ══ */}
+        {/* ══ WAGE REPORT TAB — labour roster, site + month, day-wise ══ */}
         {tab === 'wages' && (
           <>
             {/* Filters */}
             <div className="card p-4 space-y-3">
               <p className="section-title">Report Filters</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
-                  <label className="label">Start Date</label>
-                  <input type="date" className="input text-sm"
-                    value={wageFilters.startDate}
-                    onChange={e => setWageFilters(p => ({ ...p, startDate: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="label">End Date</label>
-                  <input type="date" className="input text-sm"
-                    value={wageFilters.endDate}
-                    onChange={e => setWageFilters(p => ({ ...p, endDate: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="label">Project</label>
+                <div className="col-span-2">
+                  <label className="label">Site</label>
                   <select className="input select text-sm"
-                    value={wageFilters.projectId}
-                    onChange={e => setWageFilters(p => ({ ...p, projectId: e.target.value }))}>
-                    <option value="">All projects</option>
+                    value={wageSiteId}
+                    onChange={e => setWageSiteId(e.target.value)}>
+                    {!projects.length && <option value="">Loading sites…</option>}
                     {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                 </div>
-                <div className="flex items-end">
-                  <button className="btn-primary w-full text-sm" onClick={handleLoadWageReport}>
-                    Generate Report
-                  </button>
+                <div className="col-span-2">
+                  <label className="label">Month</label>
+                  <input type="month" className="input text-sm"
+                    value={wageMonth}
+                    onChange={e => setWageMonth(e.target.value)} />
                 </div>
               </div>
             </div>
 
+            {labourReportError && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-600">
+                {labourReportError}
+              </div>
+            )}
+
             <WageReportTable
-              report={wageReport}
-              totalWageCost={totalWageCost}
-              loading={wageLoading}
+              reportData={labourReport}
+              loading={labourReportLoading}
             />
           </>
         )}
       </div>
 
-      {/* ── Add Labourer Modal ── */}
+      {/* ── Add SubContractor Modal ── */}
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Sub-Contractor" width="max-w-lg">
-        <LabourerForm
-          onSubmit={handleAddLabourer}
+        <SubContractorForm
+          onSubmit={handleAddSubContractor}
           onCancel={() => setAddOpen(false)}
         />
       </Modal>
 
       {/* ── Bulk Attendance Modal ── */}
       <Modal open={attendOpen} onClose={() => setAttendOpen(false)}
-        title="Mark Labour Attendance" width="max-w-lg">
+        title="Mark Sub-Contractor Attendance" width="max-w-lg">
         <div className="border-b border-stone-100 px-4 py-3 flex-shrink-0">
           <label className="label">Select Project</label>
           <select className="input select text-sm"
@@ -722,14 +707,14 @@ export default function LabourPage() {
           </select>
         </div>
         <BulkAttendanceForm
-          labourers={projectLabourers}
+          subContractors={projectSubContractors}
           projectId={attendProject || (projects[0]?.id ?? '')}
           onSubmit={handleMarkAttendance}
           onCancel={() => setAttendOpen(false)}
         />
       </Modal>
 
-      {/* ── Record Payment Modal (add only, no edit) ── */}
+      {/* ── Record Payment Modal ── */}
       <Modal
         open={!!recordPaymentFor}
         onClose={() => setRecordPaymentFor(null)}
@@ -737,15 +722,15 @@ export default function LabourPage() {
         width="max-w-lg"
       >
         {recordPaymentFor && (
-          <LabourRecordPaymentForm
-            labourer={recordPaymentFor}
+          <SubContractorRecordPaymentForm
+            subContractor={recordPaymentFor}
             onSubmit={handleRecordPayment}
             onCancel={() => setRecordPaymentFor(null)}
           />
         )}
       </Modal>
 
-      {/* ── Payment History Modal (view + print) ── */}
+      {/* ── Payment History Modal ── */}
       <Modal
         open={!!historyFor}
         onClose={() => setHistoryFor(null)}
@@ -758,7 +743,7 @@ export default function LabourPage() {
               <button
                 type="button"
                 className="btn-secondary text-xs flex items-center gap-1.5 px-3 py-1.5"
-                onClick={handlePrintLabourPayments}
+                onClick={handlePrintPayments}
                 disabled={paymentsLoading || !payments?.length}
                 title={!payments?.length ? 'No payments to print' : 'Print payment history'}
               >
@@ -766,8 +751,8 @@ export default function LabourPage() {
                 Print
               </button>
             </div>
-            <LabourPaymentHistory
-              labourer={historyFor}
+            <SubContractorPaymentHistory
+              subContractor={historyFor}
               payments={payments}
               loading={paymentsLoading}
             />

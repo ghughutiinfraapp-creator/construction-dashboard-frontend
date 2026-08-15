@@ -17,8 +17,8 @@ function modeLabel(mode) {
   }[mode] || mode;
 }
 
-export default function LabourRecordPaymentForm({ labourer, onSubmit, onCancel }) {
-  const pending = Math.max(0, Number(labourer.proposedAmount || 0) - Number(labourer.amountPaid || 0));
+export default function SubContractorRecordPaymentForm({ subContractor, onSubmit, onCancel }) {
+  const pending = Math.max(0, Number(subContractor.proposedAmount || 0) - Number(subContractor.amountPaid || 0));
 
   const [form, setForm] = useState({
     amount: pending > 0 ? pending.toFixed(2) : '',
@@ -65,8 +65,8 @@ export default function LabourRecordPaymentForm({ labourer, onSubmit, onCancel }
       {/* Contract / paid / pending summary */}
       <div className="flex items-center justify-between bg-stone-50 rounded-lg px-3 py-2.5">
         <div>
-          <p className="text-xs font-medium text-stone-700">{fmt(labourer.proposedAmount)} contract</p>
-          <p className="text-[11px] text-stone-400">{fmt(labourer.amountPaid)} paid so far</p>
+          <p className="text-xs font-medium text-stone-700">{fmt(subContractor.proposedAmount)} contract</p>
+          <p className="text-[11px] text-stone-400">{fmt(subContractor.amountPaid)} paid so far</p>
         </div>
         <span className="text-sm font-semibold text-amber-700 font-mono">{fmt(pending)} pending</span>
       </div>

@@ -4,7 +4,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from '../../components/ui/StatCard';
 import POPipeline from '../../components/dashboard/POPipeline';
 import RecentActivity from '../../components/dashboard/RecentActivity';
-import { dashboardAPI, labourAPI } from '../../lib/api';
+import { dashboardAPI, subContractorsAPI } from '../../lib/api';
 import { useTasks } from '../../hooks/useTasks';
 import { useAuth } from '../../context/AuthContext';
 
@@ -235,7 +235,7 @@ export default function DashboardPage() {
   const [stats,          setStats]          = useState(null);
   const [pipeline,        setPipeline]        = useState(null);
   const [activity,        setActivity]        = useState(null);
-  const [totalLabourCost, setTotalLabourCost] = useState(0);
+  const [totalSubContractorCost, setTotalSubContractorCost] = useState(0);
   const [loading,         setLoading]         = useState(true);
 
   // Reuse the same useTasks hook your tasks page uses — fetch all, no pagination
@@ -254,19 +254,19 @@ export default function DashboardPage() {
         dashboardAPI.getStats(),
         dashboardAPI.getPOPipeline(),
         dashboardAPI.getRecentActivity(),
-        // No projectId filter → every active labourer across every project.
+        // No projectId filter → every active sub-contractor across every project.
         // Only fetched for roles that can see the Budget Spent card.
-        canSeeBudget ? labourAPI.getLabourers({}) : Promise.resolve({ data: { labourers: [] } }),
+        canSeeBudget ? subContractorsAPI.getAll({}) : Promise.resolve({ data: { subContractors: [] } }),
       ]);
       setStats(s.data);
       setPipeline(p.data.pipeline);
       setActivity(a.data);
 
-      // Sum amountPaid across every labourer, every project — this is the
-      // "actual cost spent on labour" figure (same value each project's
-      // detail page derives its own per-project labourCost from).
-      const labourers = l.data.labourers || [];
-      setTotalLabourCost(labourers.reduce((sum, lab) => sum + Number(lab.amountPaid || 0), 0));
+      // Sum amountPaid across every sub-contractor, every project — this is the
+      // "actual cost spent on sub-contractors" figure (same value each project's
+      // detail page derives its own per-project subContractorCost from).
+      const subContractors = l.data.subContractors || [];
+      setTotalSubContractorCost(subContractors.reduce((sum, lab) => sum + Number(lab.amountPaid || 0), 0));
     } catch {}
     setLoading(false);
   };
@@ -279,10 +279,10 @@ export default function DashboardPage() {
     t.dueDate && new Date(t.dueDate) < new Date() && !['COMPLETED', 'VERIFIED'].includes(t.status)
   ).length;
 
-  // Budget Spent = PO spend (closed POs, from dashboard stats) + labour cost
-  // (sum of amountPaid across all labourers, all projects).
+  // Budget Spent = PO spend (closed POs, from dashboard stats) + sub-contractor cost
+  // (sum of amountPaid across all sub-contractors, all projects).
   const totalPOSpend    = Number(stats?.totalSpend || 0);
-  const totalBudgetSpent = totalPOSpend + totalLabourCost;
+  const totalBudgetSpent = totalPOSpend + totalSubContractorCost;
 
   return (
     <DashboardLayout>
@@ -316,7 +316,7 @@ export default function DashboardPage() {
                 <StatCard
                   label="Budget Spent"
                   value={stats ? fmt(totalBudgetSpent) : '—'}
-                  sub="PO + labour, all projects"
+                  sub="PO + sub-contractor, all projects"
                   icon={<MoneyIcon />}
                   color="stone"
                   loading={loading}

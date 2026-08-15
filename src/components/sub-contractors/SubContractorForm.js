@@ -8,15 +8,17 @@ const TRADE_TYPES = [
   'Welder', 'Steel Fixer', 'Helper', 'Supervisor', 'Other',
 ];
 
+
+
 function FieldError({ msg }) {
   if (!msg) return null;
   return <p className="text-red-500 text-xs mt-1">{msg}</p>;
 }
 
-export default function LabourerForm({ onSubmit, onCancel }) {
+export default function SubContractorForm({ onSubmit, onCancel }) {
   const [form, setForm] = useState({
-    name: '', phone: '', aadhaar: '',
-    tradeType: '', proposedAmount: '', projectId: '',
+    name: '', phone: '',
+   proposedAmount: '', projectId: '',
   });
   const [projects,   setProjects]   = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +37,6 @@ export default function LabourerForm({ onSubmit, onCancel }) {
   const validate = () => {
     const e = {};
     if (!form.name.trim())      e.name           = 'Name is required';
-    if (!form.tradeType)        e.tradeType       = 'Trade type is required';
     if (!form.proposedAmount || isNaN(Number(form.proposedAmount)) || Number(form.proposedAmount) <= 0)
                                 e.proposedAmount   = 'Enter a valid contract amount';
     if (!form.projectId)        e.projectId       = 'Project is required';
@@ -52,7 +53,7 @@ export default function LabourerForm({ onSubmit, onCancel }) {
         ...form,
         proposedAmount: parseFloat(form.proposedAmount),
         phone:   form.phone   || undefined,
-        aadhaar: form.aadhaar || undefined,
+      
       };
       await onSubmit(payload);
     } finally {
@@ -82,15 +83,7 @@ export default function LabourerForm({ onSubmit, onCancel }) {
           </select>
           <FieldError msg={errors.projectId} />
         </div>
-        <div>
-          <label className="label">Trade Type *</label>
-          <select className="input select" value={form.tradeType}
-            onChange={e => set('tradeType', e.target.value)}>
-            <option value="">— Select trade —</option>
-            {TRADE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <FieldError msg={errors.tradeType} />
-        </div>
+     
       </div>
 
       {/* Contract amount */}
@@ -103,7 +96,7 @@ export default function LabourerForm({ onSubmit, onCancel }) {
         <FieldError msg={errors.proposedAmount} />
       </div>
       <p className="text-[11px] text-stone-400 -mt-2">
-        Payments are recorded separately and added up automatically once the labourer is created.
+        Payments are recorded separately and added up automatically once the sub-contractor is created.
       </p>
 
       {/* Phone + Aadhaar */}
@@ -114,18 +107,13 @@ export default function LabourerForm({ onSubmit, onCancel }) {
             onChange={e => set('phone', e.target.value)}
             placeholder="9876543210" maxLength={10} />
         </div>
-        <div>
-          <label className="label">Aadhaar</label>
-          <input className="input" value={form.aadhaar}
-            onChange={e => set('aadhaar', e.target.value)}
-            placeholder="XXXX XXXX XXXX" maxLength={12} />
-        </div>
+    
       </div>
 
       <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
         <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
         <button type="submit" className="btn-primary" disabled={submitting}>
-          {submitting ? <><Spinner size={13}/> Adding…</> : 'Add Labourer'}
+          {submitting ? <><Spinner size={13}/> Adding…</> : 'Add Sub-Contractor'}
         </button>
       </div>
     </form>
