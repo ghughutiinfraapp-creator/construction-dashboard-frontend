@@ -6,10 +6,11 @@ function fmt(n) {
   if (!n) return null;
   const num = Number(n);
   if (num >= 10000000) return `₹${(num / 10000000).toFixed(2)}Cr`;
-  if (num >= 100000)   return `₹${(num / 100000).toFixed(1)}L`;
-  if (num >= 1000)     return `₹${(num / 1000).toFixed(0)}K`;
+  if (num >= 100000) return `₹${(num / 100000).toFixed(1)}L`;
+  if (num >= 1000) return `₹${(num / 1000).toFixed(0)}K`;
   return `₹${num}`;
 }
+
 
 export default function POCard({ po, onAction, userRole }) {
   const {
@@ -18,9 +19,9 @@ export default function POCard({ po, onAction, userRole }) {
     items, delivery, totalAmount, createdAt, rejectionReason,
   } = po;
 
-  const canApprove    = ['FINANCE','SUPER_ADMIN'].includes(userRole) && status === 'SUBMITTED';
-  const canAssignVendor = ['FINANCE','SUPER_ADMIN'].includes(userRole) && status === 'APPROVED';
-  const canAssignDelivery = ['FINANCE','PROJECT_MANAGER','SUPER_ADMIN'].includes(userRole) && status === 'VENDOR_ASSIGNED';
+  const canApprove = ['FINANCE', 'SUPER_ADMIN'].includes(userRole) && status === 'SUBMITTED';
+  const canAssignVendor = ['FINANCE', 'SUPER_ADMIN'].includes(userRole) && status === 'APPROVED';
+  const canAssignDelivery = ['FINANCE', 'PROJECT_MANAGER', 'SUPER_ADMIN'].includes(userRole) && status === 'VENDOR_ASSIGNED';
 
   const hasActions = canApprove || canAssignVendor || canAssignDelivery;
 
