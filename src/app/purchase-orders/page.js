@@ -28,6 +28,13 @@ function fmt(n) {
   return `₹${num.toLocaleString()}`;
 }
 
+// Full, un-abbreviated rupee value (no L/Cr shorthand) — used for the
+// Closed PO Value KPI card so the exact total is visible at a glance.
+function fmtFull(n) {
+  const num = Number(n) || 0;
+  return `₹${num.toLocaleString('en-IN')}`;
+}
+
 function PlusIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
@@ -309,12 +316,44 @@ export default function PurchaseOrdersPage() {
   const [deliveryPO, setDeliveryPO] = useState(null);
   const [deletePO,   setDeletePO]   = useState(null); // PO pending delete confirmation
 
+  // Closed PO Value KPI — computed across ALL pages, not just the
+  // currently loaded/paginated `orders` list. Fetched independently.
+  const [closedTotal,   setClosedTotal]   = useState(0);
+  const [closedCount,   setClosedCount]   = useState(0);
+  const [closedLoading, setClosedLoading] = useState(true);
+
   const canCreate = user && ['SITE_ENGINEER','PROJECT_MANAGER'].includes(user.role);
+
+  // Walks every page of CLOSED purchase orders and sums totalAmount,
+  // so the KPI reflects the true all-time total, independent of
+  // whatever page the table below happens to be showing.
+  const fetchClosedTotal = async () => {
+    setClosedLoading(true);
+    try {
+      let allClosed = [];
+      let p = 1;
+      let totalPagesClosed = 1;
+      do {
+        const { data } = await purchaseOrdersAPI.getAll({ status: 'CLOSED', page: p, limit: 100 });
+        allClosed = allClosed.concat(data.purchaseOrders || []);
+        totalPagesClosed = data.totalPages || 1;
+        p += 1;
+      } while (p <= totalPagesClosed);
+
+      setClosedCount(allClosed.length);
+      setClosedTotal(allClosed.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0));
+    } catch (err) {
+      toast.error('Failed to load closed PO total');
+    } finally {
+      setClosedLoading(false);
+    }
+  };
 
   useEffect(() => {
     projectsAPI.getAll({ limit: 100 })
       .then(({ data }) => setProjects(data.projects)).catch(() => {});
     load(1);
+    fetchClosedTotal();
   }, []);
 
   // ── Filters ───────────────────────────────────────────────────────
@@ -372,6 +411,7 @@ export default function PurchaseOrdersPage() {
       toast.success(`PO ${deletePO.poNumber} deleted`);
       if (drawerPoId === deletePO.id) setDrawerPoId(null);
       await load(page);
+      fetchClosedTotal();
     } catch (err) {
       toast.error(err?.response?.data?.error || 'Failed to delete purchase order');
     } finally {
@@ -401,6 +441,25 @@ export default function PurchaseOrdersPage() {
       }
     >
       <div className="space-y-4 animate-fade-in">
+
+        {/* KPI cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="card px-4 py-3">
+            <p className="text-[10px] uppercase tracking-wide text-stone-400 font-semibold">
+              Closed PO Value
+            </p>
+            {closedLoading ? (
+              <div className="shimmer h-6 w-28 rounded mt-1"/>
+            ) : (
+              <p className="text-lg font-mono font-bold text-stone-800 mt-1">
+                {fmtFull(closedTotal)}
+              </p>
+            )}
+            <p className="text-[11px] text-stone-400 mt-0.5">
+              {closedCount} closed order{closedCount !== 1 ? 's' : ''}
+            </p>
+          </div>
+        </div>
 
         {/* Pipeline status pills */}
         <POStatusPipeline

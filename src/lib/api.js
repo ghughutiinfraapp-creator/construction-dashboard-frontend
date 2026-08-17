@@ -152,10 +152,12 @@ export const foremanAPI = {
 
   // Aggregate + monthly report.
   getSummary: (siteId) => api.get(`/foreman/sites/${siteId}/labour/summary`),
-  // month must be 'YYYY-MM'. Returns { site, month, days, report, totalWorkers, totalMonthlyWage }
-  // — exactly the shape WageReportTable expects.
   getMonthlyReport: (siteId, month) =>
     api.get(`/foreman/sites/${siteId}/labour/monthly-report`, { params: { month } }),
+
+  // Cross-site total (dashboard Budget Spent card). Restricted server-side
+  // to SUPER_ADMIN, SUPER_ADMIN_VIEW, FINANCE.
+  getTotalCost: () => api.get('/foreman/labour/total-cost'),
 };
 
 // ─── PURCHASE ORDERS ─────────────────────────────────────────────────

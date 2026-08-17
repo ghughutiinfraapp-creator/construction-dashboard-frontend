@@ -4,7 +4,7 @@ import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from '../../components/ui/StatCard';
 import POPipeline from '../../components/dashboard/POPipeline';
 import RecentActivity from '../../components/dashboard/RecentActivity';
-import { dashboardAPI, subContractorsAPI } from '../../lib/api';
+import { dashboardAPI, subContractorsAPI, foremanAPI } from '../../lib/api';
 import { useTasks } from '../../hooks/useTasks';
 import { useAuth } from '../../context/AuthContext';
 
@@ -236,38 +236,83 @@ export default function DashboardPage() {
   const [pipeline,        setPipeline]        = useState(null);
   const [activity,        setActivity]        = useState(null);
   const [totalSubContractorCost, setTotalSubContractorCost] = useState(0);
+  const [totalLabourCost, setTotalLabourCost] = useState(0);
   const [loading,         setLoading]         = useState(true);
 
   // Reuse the same useTasks hook your tasks page uses — fetch all, no pagination
   const { tasks, loading: tasksLoading, load: loadTasks } = useTasks();
 
+  // IMPORTANT: `canSeeBudget` depends on `user`, which usually loads
+  // asynchronously (token → /auth/me). If this effect fires before `user`
+  // is populated, canSeeBudget is false on that first pass and the
+  // sub-contractor + labour calls never happen — so wait for `user`.
   useEffect(() => {
+    if (!user) return;
     loadAll();
     // Load all tasks (high limit so we get accurate counts, not just page 1)
     loadTasks(1, { limit: 500 });
-  }, []);
+  }, [user]);
 
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [s, p, a, l] = await Promise.all([
+      // Promise.allSettled instead of Promise.all: Render's free tier can
+      // cold-start slowly, and one flaky/timing-out call shouldn't blank
+      // out the whole dashboard (Promise.all rejects entirely if any one
+      // promise rejects).
+      const [s, p, a, l, w] = await Promise.allSettled([
         dashboardAPI.getStats(),
         dashboardAPI.getPOPipeline(),
         dashboardAPI.getRecentActivity(),
         // No projectId filter → every active sub-contractor across every project.
         // Only fetched for roles that can see the Budget Spent card.
         canSeeBudget ? subContractorsAPI.getAll({}) : Promise.resolve({ data: { subContractors: [] } }),
+        // Aggregated site-labour wage cost across every project (same
+        // roles gate as sub-contractor cost above).
+        canSeeBudget ? foremanAPI.getTotalCost() : Promise.resolve({ data: { totalLabourCost: 0 } }),
       ]);
-      setStats(s.data);
-      setPipeline(p.data.pipeline);
-      setActivity(a.data);
+
+      if (s.status === 'fulfilled') {
+        setStats(s.value.data);
+      } else {
+        console.error('[dashboard] stats fetch failed:', s.reason);
+      }
+
+      if (p.status === 'fulfilled') {
+        setPipeline(p.value.data.pipeline);
+      } else {
+        console.error('[dashboard] PO pipeline fetch failed:', p.reason);
+      }
+
+      if (a.status === 'fulfilled') {
+        setActivity(a.value.data);
+      } else {
+        console.error('[dashboard] recent activity fetch failed:', a.reason);
+      }
 
       // Sum amountPaid across every sub-contractor, every project — this is the
       // "actual cost spent on sub-contractors" figure (same value each project's
       // detail page derives its own per-project subContractorCost from).
-      const subContractors = l.data.subContractors || [];
-      setTotalSubContractorCost(subContractors.reduce((sum, lab) => sum + Number(lab.amountPaid || 0), 0));
-    } catch {}
+      if (l.status === 'fulfilled') {
+        const subContractors = l.value.data.subContractors || [];
+        setTotalSubContractorCost(
+          subContractors.reduce((sum, lab) => sum + Number(lab.amountPaid || 0), 0)
+        );
+      } else {
+        console.error('[dashboard] sub-contractor cost fetch failed:', l.reason?.response?.status, l.reason?.message);
+      }
+
+      // Aggregated LabourEntry.totalCost across every site — the actual
+      // wages paid out to site labour (roster workers marked via daily
+      // tick-mark attendance), separate from sub-contractor payments above.
+      if (w.status === 'fulfilled') {
+        setTotalLabourCost(Number(w.value.data.totalLabourCost || 0));
+      } else {
+        console.error('[dashboard] labour cost fetch failed:', w.reason?.response?.status, w.reason?.message);
+      }
+    } catch (err) {
+      console.error('[dashboard] loadAll unexpected error:', err);
+    }
     setLoading(false);
   };
 
@@ -279,10 +324,11 @@ export default function DashboardPage() {
     t.dueDate && new Date(t.dueDate) < new Date() && !['COMPLETED', 'VERIFIED'].includes(t.status)
   ).length;
 
-  // Budget Spent = PO spend (closed POs, from dashboard stats) + sub-contractor cost
-  // (sum of amountPaid across all sub-contractors, all projects).
+  // Budget Spent = PO spend (closed POs, from dashboard stats)
+  //              + sub-contractor cost (sum of amountPaid, all sub-contractors, all projects)
+  //              + labour wage cost (sum of LabourEntry.totalCost, all sites)
   const totalPOSpend    = Number(stats?.totalSpend || 0);
-  const totalBudgetSpent = totalPOSpend + totalSubContractorCost;
+  const totalBudgetSpent = totalPOSpend + totalSubContractorCost + totalLabourCost;
 
   return (
     <DashboardLayout>
@@ -316,7 +362,7 @@ export default function DashboardPage() {
                 <StatCard
                   label="Budget Spent"
                   value={stats ? fmt(totalBudgetSpent) : '—'}
-                  sub="PO + sub-contractor, all projects"
+                  sub="PO + sub-contractor + labour, all projects"
                   icon={<MoneyIcon />}
                   color="stone"
                   loading={loading}
@@ -380,4 +426,4 @@ export default function DashboardPage() {
       </div>
     </DashboardLayout>
   );
-}
+} 

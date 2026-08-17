@@ -119,4 +119,4 @@ export default function WageReportTable({ reportData, loading }) {
       </div>
     </div>
   );
-}
+} 
