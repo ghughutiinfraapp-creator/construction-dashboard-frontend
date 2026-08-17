@@ -11,7 +11,6 @@ function fmt(n) {
   return `₹${num}`;
 }
 
-
 export default function POCard({ po, onAction, userRole }) {
   const {
     id, poNumber, status, urgency, notes,
