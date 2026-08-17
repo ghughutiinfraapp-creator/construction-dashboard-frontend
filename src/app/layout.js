@@ -1,6 +1,7 @@
 import '../styles/globals.css';
 import { AuthProvider } from '../context/AuthContext';
 import { Toaster } from 'react-hot-toast';
+import WhatsAppButton from '../components/Whatsapp';
 
 export const metadata = {
   title: 'Construction Platform',
@@ -28,6 +29,7 @@ export default function RootLayout({ children }) {
               error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
             }}
           />
+          <WhatsAppButton phoneNumber="911234567890" message="Hi! I'd like to know more." />
         </AuthProvider>
       </body>
     </html>
