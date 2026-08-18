@@ -29,7 +29,7 @@ export default function RootLayout({ children }) {
               error: { iconTheme: { primary: '#ef4444', secondary: '#fff' } },
             }}
           />
-          <WhatsAppButton phoneNumber="911234567890" message="Hi! I'd like to know more." />
+          <WhatsAppButton phoneNumber="918979301078" message="Hi! I'd like to know more." />
         </AuthProvider>
       </body>
     </html>

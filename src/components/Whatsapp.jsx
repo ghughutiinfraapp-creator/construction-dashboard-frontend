@@ -1,7 +1,7 @@
 "use client";
 
 export default function WhatsAppButton({
-  phoneNumber = '8979301078',
+  phoneNumber = '918979301078',
   message = 'Hello! I have a query.',
 }) {
   const encodedMessage = encodeURIComponent(message);
