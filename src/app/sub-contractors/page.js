@@ -418,10 +418,10 @@ export default function SubContractorsPage() {
         <div className="flex gap-2">
           {canManage && (
             <>
-              <button className="btn-secondary text-xs px-3 py-1.5"
+              {/* <button className="btn-secondary text-xs px-3 py-1.5"
                 onClick={() => setAttendOpen(true)}>
                 Mark Attendance
-              </button>
+              </button> */}
               <button className="btn-primary text-xs px-3 py-1.5 animate-fade-in"
                 onClick={() => setAddOpen(true)}>
                 <div className='flex items-center gap-1.5'>
