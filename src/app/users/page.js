@@ -35,7 +35,7 @@ function DotsIcon() {
   </svg>;
 }
 
-function UserRowMenu({ u, isSuperAdmin, onEdit, onToggle, onReset }) {
+function UserRowMenu({ u, isSuperAdmin, canDelete, onEdit, onToggle, onReset, onDelete }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative inline-block">
@@ -46,8 +46,9 @@ function UserRowMenu({ u, isSuperAdmin, onEdit, onToggle, onReset }) {
       </button>
       {open && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-8 z-20 w-48 card shadow-lg overflow-hidden animate-fade-in">
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          {/* Opens above the trigger. z-50 + no ancestor overflow-hidden so it never gets clipped. */}
+          <div className="absolute right-0 bottom-full mb-1 z-50 w-48 card shadow-lg overflow-hidden animate-fade-in">
             <button onClick={() => { onEdit(u); setOpen(false); }}
               className="w-full text-left px-3 py-2 text-xs text-stone-600 hover:bg-stone-50">
               Edit details
@@ -65,6 +66,14 @@ function UserRowMenu({ u, isSuperAdmin, onEdit, onToggle, onReset }) {
                 {u.isActive ? 'Deactivate user' : 'Activate user'}
               </button>
             </div>
+            {canDelete && (
+              <div className="border-t border-stone-50 pt-1">
+                <button onClick={() => { onDelete(u); setOpen(false); }}
+                  className="w-full text-left px-3 py-2 text-xs text-red-600 hover:bg-red-50">
+                  Delete user
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -76,24 +85,33 @@ export default function UsersPage() {
   const { user: me } = useAuth();
   const {
     users, total, totalPages, page, loading,
-    filtersRef, load, create, update, toggleActive, resetPassword,
+    filtersRef, load, create, update, toggleActive, resetPassword, remove,
   } = useUsers();
 
   const [search,    setSearch]    = useState('');
   const [roleFilter,setRoleFilter]= useState('');
-  const [showAll,   setShowAll]   = useState(false); // false = active only
+  // true = "All" (active + inactive), false = "Active only"
+  const [showAll,   setShowAll]   = useState(true);
 
   const [createOpen,      setCreateOpen]      = useState(false);
   const [editUser,        setEditUser]        = useState(null);
   const [resetUser,       setResetUser]       = useState(null);
+  const [deleteUser,      setDeleteUser]      = useState(null);
+  const [deleting,        setDeleting]        = useState(false);
 
   const isSuperAdmin   = me?.role === 'SUPER_ADMIN';
   const isProjectMgr   = me?.role === 'PROJECT_MANAGER';
   const canCreate      = isSuperAdmin || isProjectMgr;
   const canDeactivate  = isSuperAdmin;
   const canResetPass   = isSuperAdmin;
+  const canDeleteUsers = isSuperAdmin;
 
-  useEffect(() => { load(1); }, []);
+  // Initial load — respects the default showAll=true (no isActive filter sent)
+  useEffect(() => {
+    const f = { search: '', role: '', isActive: showAll ? '' : 'true' };
+    filtersRef.current = f;
+    load(1, f);
+  }, []);
 
   // Debounced search + filters
   useEffect(() => {
@@ -123,6 +141,20 @@ export default function UsersPage() {
 
   const handleReset = async (id, password) => {
     await resetPassword(id, password);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteUser) return;
+    setDeleting(true);
+    try {
+      await remove(deleteUser.id);
+      toast.success(`${deleteUser.name} was deactivated`);
+      setDeleteUser(null);
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Failed to delete user');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const from = total === 0 ? 0 : (page - 1) * 10 + 1;
@@ -175,7 +207,10 @@ export default function UsersPage() {
         </div>
 
         {/* Table */}
-        <div className="card overflow-hidden">
+        {/* overflow-hidden removed from BOTH the outer card and the table wrapper below —
+            an overflow-hidden ancestor clips the row's absolutely-positioned dropdown menu,
+            which is why clicking the three dots appeared to do nothing. */}
+        <div className="card">
           {loading ? (
             <div className="divide-y divide-stone-50">
               {[...Array(8)].map((_,i) => (
@@ -198,65 +233,69 @@ export default function UsersPage() {
             />
           ) : (
             <>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-stone-100 bg-stone-25">
-                    {['User','Email','Phone','Role','Joined','Status',''].map(h => (
-                      <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
-                                             text-stone-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(u => (
-                    <tr key={u.id} className="border-b border-stone-50 hover:bg-stone-25 transition-colors group">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
-                            <span className="text-amber-700 text-[10px] font-semibold">
-                              {u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
-                            </span>
-                          </div>
-                          <span className="text-sm font-medium text-stone-800">{u.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-stone-500 font-mono">{u.email}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-stone-500 font-mono">{u.phone || '—'}</span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`badge text-[11px] ${ROLE_COLOURS[u.role] || 'bg-stone-100 text-stone-500'}`}>
-                          {ROLE_LABELS[u.role] || u.role}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="text-xs text-stone-400">
-                          {format(new Date(u.createdAt), 'dd MMM yyyy')}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`badge ${u.isActive
-                          ? 'bg-green-50 text-green-700'
-                          : 'bg-stone-100 text-stone-400'}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-green-400' : 'bg-stone-300'}`}/>
-                          {u.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <UserRowMenu
-                          u={u}
-                          isSuperAdmin={isSuperAdmin}
-                          onEdit={setEditUser}
-                          onToggle={handleToggle}
-                          onReset={setResetUser}
-                        />
-                      </td>
+              <div className="rounded-xl border border-stone-100">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-stone-100 bg-stone-25">
+                      {['User','Email','Phone','Role','Joined','Status',''].map(h => (
+                        <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold
+                                               text-stone-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>  
+                    {users.map(u => (
+                      <tr key={u.id} className="border-b border-stone-50 hover:bg-stone-25 transition-colors group">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                              <span className="text-amber-700 text-[10px] font-semibold">
+                                {u.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase()}
+                              </span>
+                            </div>
+                            <span className="text-sm font-medium text-stone-800">{u.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-stone-500 font-mono">{u.email}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-stone-500 font-mono">{u.phone || '—'}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`badge text-[11px] ${ROLE_COLOURS[u.role] || 'bg-stone-100 text-stone-500'}`}>
+                            {ROLE_LABELS[u.role] || u.role}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="text-xs text-stone-400">
+                            {format(new Date(u.createdAt), 'dd MMM yyyy')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`badge ${u.isActive
+                            ? 'bg-green-50 text-green-700'
+                            : 'bg-stone-100 text-stone-400'}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${u.isActive ? 'bg-green-400' : 'bg-stone-300'}`}/>
+                            {u.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <UserRowMenu
+                            u={u}
+                            isSuperAdmin={isSuperAdmin}
+                            canDelete={canDeleteUsers && u.id !== me?.id}
+                            onEdit={setEditUser}
+                            onToggle={handleToggle}
+                            onReset={setResetUser}
+                            onDelete={setDeleteUser}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -307,6 +346,25 @@ export default function UsersPage() {
       </Modal>
 
       <ResetPasswordModal user={resetUser} onConfirm={handleReset} onClose={() => setResetUser(null)} />
+
+      <Modal open={!!deleteUser} onClose={() => !deleting && setDeleteUser(null)} title="Delete User" width="max-w-sm">
+        <div className="p-5 space-y-4">
+          <p className="text-sm text-stone-600">
+            Delete <strong className="text-stone-800">{deleteUser?.name}</strong>? They will be
+            deactivated and lose access. Their existing records (tasks, POs, payments) stay intact.
+          </p>
+          <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
+            <button type="button" className="btn-secondary" disabled={deleting}
+              onClick={() => setDeleteUser(null)}>
+              Cancel
+            </button>
+            <button type="button" className="btn-primary bg-red-600 hover:bg-red-700" disabled={deleting}
+              onClick={handleDelete}>
+              {deleting ? 'Deleting…' : 'Delete User'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </DashboardLayout>
   );
 }

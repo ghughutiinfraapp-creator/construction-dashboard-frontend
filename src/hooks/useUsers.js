@@ -10,7 +10,7 @@ export function useUsers() {
   const [page,       setPage]       = useState(1);
   const [loading,    setLoading]    = useState(false);
 
-  const filtersRef = useRef({ search: '', role: '', isActive: 'true' });
+  const filtersRef = useRef({ search: '', role: '', isActive: '' });
 
   const load = useCallback(async (pg = 1, overrideFilters) => {
     const f = overrideFilters ?? filtersRef.current;
@@ -18,9 +18,14 @@ export function useUsers() {
     setLoading(true);
     try {
       const params = { page: pg, limit: 10 };
-      if (f.search)   params.search   = f.search;
-      if (f.role)     params.role     = f.role;
-      if (f.isActive !== '') params.isActive = f.isActive;
+      if (f.search) params.search = f.search;
+      if (f.role)   params.role   = f.role;
+      // Only attach isActive when explicitly filtering to true/false.
+      // Empty string ('') means "show all" -> param omitted entirely.
+      if (f.isActive === 'true' || f.isActive === 'false' || f.isActive === true || f.isActive === false) {
+        params.isActive = f.isActive;
+      }
+      console.log('[useUsers] fetching with params:', params); // TEMP: remove once confirmed working
       const { data } = await usersAPI.getAll(params);
       setUsers(data.users);
       setTotal(data.total);
@@ -60,9 +65,17 @@ export function useUsers() {
     toast.success('Password reset successfully');
   };
 
+  // Delete (soft-delete: deactivates + revokes sessions) (SUPER_ADMIN only)
+  const remove = async (id) => {
+    const { data } = await usersAPI.delete(id);
+    setUsers(prev => prev.filter(u => u.id !== id));
+    setTotal(prev => Math.max(0, prev - 1));
+    return data;
+  };
+
   return {
     users, total, totalPages, page, loading,
     filtersRef, load,
-    create, update, toggleActive, resetPassword,
+    create, update, toggleActive, resetPassword, remove,
   };
 }

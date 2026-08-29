@@ -58,6 +58,8 @@ export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   me: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword:  (token, password) => api.post('/auth/reset-password', { token, password }),
 };
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────
@@ -85,6 +87,7 @@ export const usersAPI = {
   update: (id, data) => api.put(`/users/${id}`, data),
   getByRole: (role) => api.get(`/users/by-role/${role}`),
   resetPassword: (id, password) => api.put(`/users/${id}/reset-password`, { password }),
+  delete: (id) => api.delete(`/users/${id}`),
 };
 
 // ─── ATTENDANCE ──────────────────────────────────────────────────────
